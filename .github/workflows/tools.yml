@@ -1,0 +1,21 @@
+# tools: hooks と tools の lint とテスト。GitHub-hosted なので pull_request でも安全に走る。
+name: tools
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --group dev
+      - run: uv run ruff check
+      - run: uv run pytest -q

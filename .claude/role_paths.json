@@ -1,0 +1,28 @@
+{
+  "_comment": "役割ごとに書けない場所。hooks/pretooluse_guard.py と settings.*.json の両方がこれを参照する(二重に守る)。glob は fnmatch。",
+  "env_only": [
+    "AGENTS.md",
+    ".claude/*",
+    ".claude/**",
+    ".github/*",
+    ".github/**",
+    "tools/*",
+    "tools/**",
+    "Packages/manifest.json",
+    "Packages/packages-lock.json",
+    "docs/ops/*",
+    "docs/ops/**",
+    "LICENSE",
+    ".gitattributes",
+    ".gitignore"
+  ],
+  "owner_written": [
+    "docs/OWNER_WRITTEN.md",
+    "docs/METRICS.md",
+    "core/Yurecheck.Core/Measure/*Reference*.cs",
+    "core/Yurecheck.Core/Judge/*.cs",
+    "Assets/Yurecheck/Runtime/Stepper.cs",
+    "Assets/Yurecheck/Runtime/Sdf/Sign*.cs",
+    "scenarios/thresholds.json"
+  ]
+}

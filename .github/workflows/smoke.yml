@@ -1,0 +1,44 @@
+# smoke: push ごとに、ビルド → EditMode テスト → 最小シナリオ。閾値の不合格は失敗にしない(数字を見るため)。
+# pull_request では走らせない(公開リポジトリで self-hosted runner を fork から守るため。docs/ops/runner.md)。
+name: smoke
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: [self-hosted, windows, yurecheck]
+    # runner を登録して Settings → Secrets and variables → Actions → Variables に RUNNER_READY=true を置くまでは飛ばす(queued のまま 24 時間で失敗になるのを防ぐ。docs/ops/runner.md)
+    if: github.event_name != 'pull_request' && vars.RUNNER_READY == 'true'
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: EditMode tests
+        shell: pwsh
+        run: |
+          & $env:UNITY_PATH -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults results/editmode.xml -logFile results/editmode.log
+      - name: Build runner
+        shell: pwsh
+        run: |
+          & $env:UNITY_PATH -batchmode -nographics -projectPath . -executeMethod Yurecheck.Editor.BuildScript.Build -logFile results/build.log
+      - name: Smoke scenarios (needs graphics; runner runs in an interactive session)
+        shell: pwsh
+        run: |
+          & Builds/Yurecheck.exe --scenarios scenarios/smoke.json --out results/smoke --screen-width 640 --screen-height 360
+          if ($LASTEXITCODE -eq 2) { throw "runner error" }
+      - name: Determinism (SpringBone)
+        shell: pwsh
+        run: uv run tools/determinism.py results/smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ github.sha }}
+          path: results/

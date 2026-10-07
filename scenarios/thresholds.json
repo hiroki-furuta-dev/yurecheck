@@ -1,0 +1,10 @@
+{
+  "_comment": "既定値はメンテナの目視校正で決める(docs/thresholds/calibration.md)。校正前の仮の値。正規化した単位で持つ。",
+  "pen_rate_max": 0.02,
+  "pen_p99_permille_max": 10.0,
+  "div_vmax_mps": 20.0,
+  "div_aabb_ratio_max": 3.0,
+  "jit_flips_per_s_max": 6.0,
+  "cpu_step_ms_max": 2.0,
+  "gpu_delta_ms": null
+}

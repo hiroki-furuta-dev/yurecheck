@@ -1,0 +1,37 @@
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+crashlytics-build.properties
+# Yurecheck
+results/
+*.local.json
+.claude/settings.local.json
+__pycache__/
+*.pyc
+# 有料アセットはリポジトリに入れない(任意依存)
+Assets/MagicaCloth2/
+Assets/MagicaCloth2.meta
+.venv/
+# 秘密
+.env
+.env.*
+*.pem
+*.key
+# 個人用の指示(あると AGENTS.md が読まれなくなる。作るなら /config の Project instructions を claude-md-and-agents-md に)
+CLAUDE.local.md

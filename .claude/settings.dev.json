@@ -1,0 +1,60 @@
+{
+  "_comment": "開発の役割。起動: claude --settings .claude/settings.dev.json  (alias: cc-dev)。環境の範囲と、メンテナが書くファイル(docs/OWNER_WRITTEN.md、.claude/role_paths.json の owner_written)は書けない。環境に要望があれば docs/proposals/YYYY-MM-DD-内容.md に要件だけ書く。",
+  "env": {
+    "YURECHECK_ROLE": "dev"
+  },
+  "permissions": {
+    "allow": [
+      "Write(./Assets/**)",
+      "Edit(./Assets/**)",
+      "Write(./docs/**)",
+      "Edit(./docs/**)",
+      "Write(./scenarios/**)",
+      "Edit(./scenarios/**)",
+      "Write(./presets/**)",
+      "Edit(./presets/**)",
+      "Write(./motions/ATTRIBUTION.md)",
+      "Edit(./motions/ATTRIBUTION.md)",
+      "Write(./avatars/README.md)",
+      "Edit(./avatars/README.md)",
+      "Bash(uv run tools/status.py:*)"
+    ],
+    "deny": [
+      "Write(./AGENTS.md)",
+      "Edit(./AGENTS.md)",
+      "Write(./.claude/**)",
+      "Edit(./.claude/**)",
+      "Write(./.github/**)",
+      "Edit(./.github/**)",
+      "Write(./tools/**)",
+      "Edit(./tools/**)",
+      "Write(./Packages/**)",
+      "Edit(./Packages/**)",
+      "Write(./docs/ops/**)",
+      "Edit(./docs/ops/**)",
+      "Write(./LICENSE)",
+      "Edit(./LICENSE)",
+      "Write(./.gitattributes)",
+      "Edit(./.gitattributes)",
+      "Write(./.gitignore)",
+      "Edit(./.gitignore)",
+      "Write(./core/Yurecheck.Core/Judge/**)",
+      "Edit(./core/Yurecheck.Core/Judge/**)",
+      "Write(./core/Yurecheck.Core/Measure/*Reference*.cs)",
+      "Edit(./core/Yurecheck.Core/Measure/*Reference*.cs)",
+      "Write(./core/Yurecheck.Core/Judge/*.cs)",
+      "Edit(./core/Yurecheck.Core/Judge/*.cs)",
+      "Write(./docs/OWNER_WRITTEN.md)",
+      "Edit(./docs/OWNER_WRITTEN.md)",
+      "Write(./docs/METRICS.md)",
+      "Edit(./docs/METRICS.md)",
+      "Write(./Assets/Yurecheck/Runtime/Stepper.cs)",
+      "Edit(./Assets/Yurecheck/Runtime/Stepper.cs)",
+      "Write(./Assets/Yurecheck/Runtime/Sdf/Sign*.cs)",
+      "Edit(./Assets/Yurecheck/Runtime/Sdf/Sign*.cs)",
+      "Write(./scenarios/thresholds.json)",
+      "Edit(./scenarios/thresholds.json)"
+    ]
+  },
+  "_proposal": "案(メンテナの判断待ち): 長い自律実行とレビューは最上位のモデルを high から、対話の小さな編集は一段下のモデルを high で。決まったら \"model\" と \"effortLevel\" をここに足す。permissions.defaultMode は最初は既定(ask)を推奨。"
+}

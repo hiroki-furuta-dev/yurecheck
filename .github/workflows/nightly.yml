@@ -1,0 +1,33 @@
+# nightly: 毎晩 full.json を回し、閾値の不合格を失敗にする。
+name: nightly
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 03:00 JST
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nightly:
+    runs-on: [self-hosted, windows, yurecheck]
+    # runner を登録して Settings → Secrets and variables → Actions → Variables に RUNNER_READY=true を置くまでは飛ばす(queued のまま 24 時間で失敗になるのを防ぐ。docs/ops/runner.md)
+    if: github.event_name != 'pull_request' && vars.RUNNER_READY == 'true'
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Build runner
+        shell: pwsh
+        run: |
+          & $env:UNITY_PATH -batchmode -nographics -projectPath . -executeMethod Yurecheck.Editor.BuildScript.Build -logFile results/build.log
+      - name: Full scenarios
+        shell: pwsh
+        run: |
+          & Builds/Yurecheck.exe --scenarios scenarios/full.json --out results/full --screen-width 640 --screen-height 360
+          if ($LASTEXITCODE -ne 0) { throw "fail: exit $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-${{ github.run_id }}
+          path: results/

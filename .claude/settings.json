@@ -1,0 +1,124 @@
+{
+  "_comment": "共通の設定。役割ごとの差分は settings.env.json / settings.dev.json を claude --settings で重ねる。permission mode は既定の auto でよい(deny と PreToolUse hook は auto でも効き、push は classifier が既定で止める)。allow は読み取り専用の命令だけ。hooks と tools は uv run で呼ぶ。止めるのは PreToolUse(ファイルの guard と commit/push のゲート)と git の pre-commit。attribution は切ってある(AI の関与は docs/AI_USAGE.md と PR の分担欄に残す)。",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git show:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(uv run tools/status.py:*)",
+      "Bash(uv run tools/determinism.py:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(date:*)",
+      "Bash(git branch --list:*)",
+      "Bash(git branch --show-current)",
+      "Bash(uv run tools/precommit.py)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.claude/**)",
+      "Read(./.claude/settings.local.json)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git add -A:*)",
+      "Bash(git add .:*)",
+      "Bash(git add --all:*)",
+      "Bash(git checkout main:*)",
+      "Bash(git switch main:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git branch -d:*)",
+      "Bash(ruff check --fix:*)",
+      "Bash(uv run ruff check --fix:*)",
+      "Bash(uv run ruff format:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/tools/session_mark.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/tools/status.py\" --hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pretooluse_guard.py\" || exit 2",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/commit_gate.sh\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/tools/handoff.py\" --auto",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/.claude/hooks/posttoolusefailure_lessons.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "attribution": {
+    "commit": false,
+    "pr": false,
+    "sessionUrl": false
+  }
+}
