@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 
+import pytest
 from conftest import REPO, commit_file, git, run_hook, run_tool
 
 sys.path.insert(0, os.path.join(REPO, "tools"))
@@ -184,7 +185,18 @@ def test_issue_number_from_branch_names():
 
 
 # 5. test.py の偽成功
+WINDOWS_PYTEST = "docs/proposals/2026-10-10-windows-pytest.md"
+
+
+def _unity_project(tmp_repo):
+    (tmp_repo / "ProjectSettings").mkdir(exist_ok=True)
+    (tmp_repo / "ProjectSettings" / "ProjectVersion.txt").write_text("m_EditorVersion: 6000.3.18f1\n", encoding="utf-8")
+
+
+@pytest.mark.xfail(sys.platform == "win32", raises=FileNotFoundError, strict=True,
+                   reason=f"偽の Unity(unity.sh)を Windows で起動できず last_test.json が出ない。{WINDOWS_PYTEST}")
 def test_test_py_does_not_reuse_old_xml(tmp_repo):
+    _unity_project(tmp_repo)
     (tmp_repo / "results").mkdir(exist_ok=True)
     (tmp_repo / "results" / "editmode.xml").write_text('<test-run total="3" failed="0"/>', encoding="utf-8")
     fake_unity = tmp_repo / "unity.sh"
@@ -197,6 +209,7 @@ def test_test_py_does_not_reuse_old_xml(tmp_repo):
 
 
 def test_test_py_zero_tests_is_not_success(tmp_repo):
+    _unity_project(tmp_repo)
     fake_unity = tmp_repo / "unity.sh"
     fake_unity.write_text("#!/bin/sh\nout=''\nwhile [ $# -gt 0 ]; do if [ \"$1\" = -testResults ]; then out=$2; fi; shift; done\n"
                           "echo '<test-run total=\"0\" failed=\"0\"/>' > \"$out\"\nexit 0\n", encoding="utf-8")
@@ -204,6 +217,54 @@ def test_test_py_zero_tests_is_not_success(tmp_repo):
     r = run_tool(tmp_repo, "tools/test.py", ["--edit"], extra_env={"UNITY_PATH": str(fake_unity)})
     assert r.returncode == 1
 
+
+
+def _marking_unity(tmp_repo):
+    """起動したら印のファイルを書く偽の Unity。"""
+    mark = tmp_repo / "unity_started"
+    if sys.platform == "win32":
+        fake = tmp_repo / "unity.cmd"
+        fake.write_text(f'@echo x > "{mark}"\r\n', encoding="utf-8")
+    else:
+        fake = tmp_repo / "unity.sh"
+        fake.write_text(f"#!/bin/sh\necho x > '{mark}'\n", encoding="utf-8")
+        fake.chmod(0o755)
+    return fake, mark
+
+
+def test_test_py_skips_without_unity_project(tmp_repo):
+    fake, mark = _marking_unity(tmp_repo)
+    r = run_tool(tmp_repo, "tools/test.py", [], extra_env={"UNITY_PATH": str(fake)})
+    assert r.returncode == 0 and not mark.exists()
+    assert "ProjectSettings/ProjectVersion.txt が無い" in r.stdout + r.stderr
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    head = git(tmp_repo, "rev-parse", "--short", "HEAD").stdout.strip()
+    assert last["skipped"] == "Unity プロジェクトが無い" and last["commit"] == head and last["passed"] is False
+
+
+def _pytest_suite(tmp_repo, body):
+    (tmp_repo / "tools" / "tests").mkdir(exist_ok=True)
+    (tmp_repo / "tools" / "tests" / "test_x.py").write_text("import pytest\n\n\n" + body, encoding="utf-8")
+
+
+def test_test_py_env_runs_pytest_and_counts_known_failures(tmp_repo):
+    _pytest_suite(tmp_repo, "def test_ok():\n    pass\n\n\n"
+                            "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
+                            "def test_known():\n    raise KeyError\n")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="env")
+    assert r.returncode == 0, r.stdout + r.stderr
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["platforms"] == ["pytest"] and last["passed"] is True
+    assert last["summary"]["pytest"]["passed"] == 1 and last["summary"]["pytest"]["xfailed"] == 1
+
+
+def test_test_py_env_reports_unknown_failures_by_name(tmp_repo):
+    _pytest_suite(tmp_repo, "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
+                            "def test_known():\n    raise ValueError\n")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="env")
+    assert r.returncode == 1
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["passed"] is False and last["summary"]["pytest"]["failed_tests"] == ["tools/tests/test_x.py::test_known"]
 
 # 6. commit.py: 指定外のステージ済み
 def test_commit_refuses_when_other_changes_are_staged(tmp_repo):

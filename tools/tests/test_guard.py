@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 from conftest import run_hook
@@ -71,6 +72,8 @@ def test_pretooluse_gates_fail_closed_in_settings():
 
 
 
+@pytest.mark.xfail(sys.platform == "win32", raises=FileNotFoundError, strict=True,
+                   reason="Windows ネイティブの Python から /bin/sh が見えない。docs/proposals/2026-10-10-windows-pytest.md")
 def test_commit_gate_sh_without_uv_blocks_only_commit_push(tmp_repo):
     """Codex 2回目の指摘: uv が無いと Bash が全部止まり doctor に届かない。検査が起動できないときは commit/push だけ止める。"""
     path = "/usr/bin:/bin"  # coreutils はあるが uv は無い PATH
