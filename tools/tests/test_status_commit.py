@@ -101,3 +101,13 @@ def test_commit_takes_paths_already_staged_by_git_mv_and_git_rm(tmp_repo):
     assert r.returncode == 0, r.stderr
     st = subprocess.run(["git", "status", "--porcelain"], cwd=tmp_repo, capture_output=True, text=True).stdout
     assert st == ""
+
+
+def test_commit_takes_a_directory_removed_by_git_rm_r(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/7-x"], cwd=tmp_repo, check=True)
+    subprocess.run(["git", "rm", "-r", "-q", "docs/ops"], cwd=tmp_repo, check=True)
+    r = run_tool(tmp_repo, "tools/commit.py", ["ops を消した", "docs/ops"])
+    assert r.returncode == 0, r.stderr
+    st = subprocess.run(["git", "status", "--porcelain"], cwd=tmp_repo, capture_output=True, text=True).stdout
+    assert st == ""

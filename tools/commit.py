@@ -30,12 +30,16 @@ def current_branch():
     return r.stdout.strip()
 
 
+def under(path, given):
+    """path が渡したパス given そのものか、その下にあるか(ディレクトリを渡したとき)。"""
+    return path == given or path.startswith(given.rstrip("/") + "/")
+
+
 def already_staged_away(p, root, staged):
     """git mv / git rm で既にステージ済みの旧パス。index にも作業ツリーにも無く、git add に渡すと pathspec で落ちる。"""
-    r = guardlib.rel(p, root)
     if os.path.lexists(p) or run(["git", "ls-files", "--", p]).stdout:
         return False
-    return any(s == r or s.startswith(r.rstrip("/") + "/") for s in staged)
+    return any(under(s, guardlib.rel(p, root)) for s in staged)
 
 
 def not_mine(root, files):
@@ -72,7 +76,7 @@ def main() -> int:
         return 2
     staged = [s for s in run(["git", "diff", "--cached", "--name-only", "--no-renames", "-z"]).stdout.split("\0") if s]
     wanted = {guardlib.rel(p, root) for p in paths}
-    other = [] if every else [s for s in staged if s not in wanted]
+    other = [] if every else [s for s in staged if not any(under(s, w) for w in wanted)]
     if other:
         print("指定外の変更が既にステージされている。先に git restore --staged で外すこと: " + ", ".join(other[:5]), file=sys.stderr)
         return 2
