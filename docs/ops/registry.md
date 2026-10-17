@@ -45,7 +45,7 @@
 | .claude/rules/ops.md の pull_request | 禁止を self-hosted の workflow に限った。tools.yml(GitHub-hosted)と食い違っていた | 2026-10-17 変更(Issue #3) |
 | 役割の名前 env → ops(運用) | settings.env.json を settings.ops.json に、role_paths.json の env_only を ops_only にし、dev_only を足した。文言も「環境の役割」から「運用の役割」へ。docs/adr/0015 は決めた時点の記録なので書き換えず、改名はここに残す | 2026-10-17 変更(Issue #3) |
 | tools/commit.py | `--all`(もう一方の役割とメンテナのファイルが混ざれば止める)、削除と移動のパス、git mv/git rm で既にステージ済みの旧パスを git add に渡さない | 2026-10-17 変更(Issue #3。git mv/git rm の後は旧パスが pathspec で落ちていた) |
-| (退役) docs/proposals/ | 2026-10-17 削除(Issue #3)。要望は「要望」の Issue にした。一覧と label で拾え、受けた作業の PR から参照できる。残っていた3件は Issue に移し、windows-pytest は Issue #3 で解決した |
+| (退役) docs/proposals/ | 2026-10-17 削除(Issue #3)。要望は「要望」の Issue にした。一覧と label で拾え、受けた作業の PR から参照できる。残っていた3件は Issue #5、#6、#7 に移し(#5 と #7 のメンテナが書くファイルの部分は保留)、windows-pytest は Issue #3 で解決した |
 | .github/ISSUE_TEMPLATE/ | task.yml(結果、完了の条件、含まないもの、役割、Milestone)、request.yml(要望: 要件、なぜ、再現)、config.yml(白紙の Issue を切る)。label は ops、dev、要望 | 2026-10-17 変更(Issue #3。task.md を forms にし、proposals の受け皿を足した) |
 | tools/tests/ の Windows 対応 | commit_gate.sh のテストは sh を PATH から探す(無ければ理由つきで skip)。偽の Unity は Windows では .cmd にした。2件の xfail を外し、`uv run pytest` が Windows で全部通る | 2026-10-17 変更(Issue #3。提案 windows-pytest。手元で2件の失敗が普通になっていた) |
 | .claude/settings.json の Read の deny | `~/.claude/**` を `~/.claude/.credentials.json` と `~/.claude/settings.json` に絞った | 2026-10-17 変更(Issue #3。大きなツールの出力が ~/.claude/projects/ に退避され、Read で読めなかった) |
