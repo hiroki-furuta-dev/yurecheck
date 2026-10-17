@@ -15,5 +15,5 @@ core/Yurecheck.Core は Unity の外でビルドする .NET のライブラリ(d
 - nullable はエラー(TreatWarningsAsErrors)。BannedApiAnalyzers で DateTime.Now、Random の既定、Environment への依存を禁止する(同じ入力から同じ数字、のため)。
 - テストは core/Yurecheck.Core.Tests(NUnit。Unity Test Framework と同じ書き方で揃える)。`dotnet test` が GitHub-hosted の runner で回る(.github/workflows/tools.yml)。参照実装のテストの期待値はメンテナが書く(docs/OWNER_WRITTEN.md)。
 - DLL と pdb は csproj の post-build target が Assets/Yurecheck/Plugins/ に写す。手で写さない。CI も同じ target を使う。
-- メンテナが書くファイル(Measure/*Reference*.cs、Judge/*.cs)は AI が書かない。提案は PR のコメントか docs/proposals/ に。
+- メンテナが書くファイル(Measure/*Reference*.cs、Judge/*.cs)は AI が書かない。提案は PR のコメントか「要望」の Issue に。
 - 前身の実装(docs/adr/0014)のコードと素材は写さない。知識だけを使う。

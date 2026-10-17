@@ -51,6 +51,10 @@ v1 の対象は VRM と4つの指標ですが、そこに限る理由はあり�
 
 hooks は uv で動くので、1 を飛ばすと Claude Code の中でファイルの書き込みが止まります。これは意図した動きで、止まったら 1 に戻ってください。
 
+Claude Code は、運用(ops)か開発(dev)のどちらかの役割で起動します。開発サイクルの仕組みを直すときは `claude --settings .claude/settings.ops.json`、道具の機能を作るときは `claude --settings .claude/settings.dev.json` です。
+
+不具合や変えてほしいことは、Issue の「要望」のフォームから出してください。
+
 ## 文書
 
 - docs/DESIGN.md 設計の全体

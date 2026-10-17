@@ -1,6 +1,6 @@
-# 環境の資産の台帳
+# 運用の資産の台帳
 
-環境の役割が足したり変えたりしたら1行足す(何を、なぜ)。生成できる一覧は作らず、方針と履歴だけを手で書く。
+運用の役割が足したり変えたりしたら1行足す(何を、なぜ)。生成できる一覧は作らず、方針と履歴だけを手で書く。
 
 | 資産 | 用途 | 更新 |
 |---|---|---|
@@ -38,8 +38,15 @@
 | tools/doctor.py, .claude/skills/onboarding | 合流した人の環境の点検と案内。何も変更せず、直し方を提案する | 2026-10-07 追加(メンテナの指示) |
 | .claude/skills/pr | PR の説明を差分から下書きし、言い直しを受け、食い違いを直してから gh で出す。AI_USAGE の行も足す | 2026-10-08 追加(メンテナの提案) |
 | tools/status.py の段階 6 | APPROVED 待ちを廃止(作者は自分の PR を承認できず、1人では到達不能だった)。説明をメンテナが書いた + [review-pr] のコメント、に変更 | 2026-10-08 変更(メンテナの問い) |
-| tools/status.py | 段階の番号をやめ、済・未の一覧(作業、未コミット、テスト、push、PR、説明、CI、レビュー)と次にやることを出す。env と dev で同じ一覧 | 2026-10-17 変更(Issue #3。env では Issue のブランチでも「作業は無い」と出ていた) |
+| tools/status.py | 段階の番号をやめ、済・未の一覧(作業、手元の変更、テスト、push、PR、説明、CI、レビュー)と次にやることを出す。ops と dev で同じ一覧 | 2026-10-17 変更(Issue #3。当時の env では Issue のブランチでも「作業は無い」と出ていた) |
 | tools/test.py | env は pytest、dev は Unity を回す。Unity プロジェクトが無ければ起動せずに飛ばす。既知の失敗は xfail(strict、raises、reason に Issue か提案) | 2026-10-17 変更(Issue #3) |
-| (削除) tools/handoff.py、/handoff、SessionEnd の hook、docs/handoff/ | 2026-10-17 削除(Issue #3)。merge の後に書く HANDOFF を入れるブランチが無く、中身は PR 本文、Issue、lessons、proposals と重なるため |
+| (削除) tools/handoff.py、/handoff、SessionEnd の hook、docs/handoff/ | 2026-10-17 削除(Issue #3)。merge の後に書く HANDOFF を入れるブランチが無かった。中身は PR 本文と重なる。worktree に置いた分は worktree と一緒に消えた |
 | tools/models.py | transcript から使ったモデルを数え、PR の分担欄に写す1行を出す | 2026-10-17 追加(Issue #3。handoff.py から移した) |
 | .claude/rules/ops.md の pull_request | 禁止を self-hosted の workflow に限った。tools.yml(GitHub-hosted)と食い違っていた | 2026-10-17 変更(Issue #3) |
+| 役割の名前 env → ops(運用) | settings.env.json を settings.ops.json に、role_paths.json の env_only を ops_only にし、dev_only を足した。文言も「環境の役割」から「運用の役割」へ。docs/adr/0015 は決めた時点の記録なので書き換えず、改名はここに残す | 2026-10-17 変更(Issue #3) |
+| tools/commit.py | `--all`(もう一方の役割とメンテナのファイルが混ざれば止める)、削除と移動のパス、git mv/git rm で既にステージ済みの旧パスを git add に渡さない | 2026-10-17 変更(Issue #3。git mv/git rm の後は旧パスが pathspec で落ちていた) |
+| (退役) docs/proposals/ | 2026-10-17 削除(Issue #3)。要望は「要望」の Issue にした。一覧と label で拾え、受けた作業の PR から参照できる。残っていた3件は Issue に移し、windows-pytest は Issue #3 で解決した |
+| .github/ISSUE_TEMPLATE/ | task.yml(結果、完了の条件、含まないもの、役割、Milestone)、request.yml(要望: 要件、なぜ、再現)、config.yml(白紙の Issue を切る)。label は ops、dev、要望 | 2026-10-17 変更(Issue #3。task.md を forms にし、proposals の受け皿を足した) |
+| tools/tests/ の Windows 対応 | commit_gate.sh のテストは sh を PATH から探す(無ければ理由つきで skip)。偽の Unity は Windows では .cmd にした。2件の xfail を外し、`uv run pytest` が Windows で全部通る | 2026-10-17 変更(Issue #3。提案 windows-pytest。手元で2件の失敗が普通になっていた) |
+| .claude/settings.json の Read の deny | `~/.claude/**` を `~/.claude/.credentials.json` と `~/.claude/settings.json` に絞った | 2026-10-17 変更(Issue #3。大きなツールの出力が ~/.claude/projects/ に退避され、Read で読めなかった) |
+| push | AI が打つ。auto mode の判定が止めたらメンテナが承認する(/pr の手順 1 と 6、WORKFLOW.md) | 2026-10-17 変更(Issue #3。同日の 0787bd8 で「メンテナが打つ」にしたのを戻した) |

@@ -68,5 +68,5 @@
       "Edit(./scenarios/thresholds.json)"
     ]
   },
-  "_proposal": "案(メンテナの判断待ち): 長い自律実行とレビューは最上位のモデルを high から、対話の小さな編集は一段下のモデルを high で。決まったら \"model\" と \"effortLevel\" をここに足す。permissions.defaultMode は最初は既定(ask)を推奨。"
+  "_proposal": "案(メンテナの判断待ち): 長い自律実行とレビューは最上位のモデルを high から、対話の小さな編集は一段下のモデルを high で。決まったら \"model\" と \"effortLevel\" をここに足す。使ったモデルは /pr が tools/models.py で transcript から数える。permission mode は settings.json の _comment のとおり既定の auto。"
 }

@@ -68,5 +68,5 @@
       "Edit(./scenarios/thresholds.json)"
     ]
   },
-  "_proposal": "案(メンテナの判断待ち): 環境の作業は定型が多いので effortLevel を medium、model は一段安いものでも足りる見込み。決まったら \"model\" と \"effortLevel\" をここに足す。使ったモデルは hook が transcript から記録する。"
+  "_proposal": "案(メンテナの判断待ち): 運用の作業は定型が多いので effortLevel を medium、model は一段安いものでも足りる見込み。決まったら \"model\" と \"effortLevel\" をここに足す。使ったモデルは /pr が tools/models.py で transcript から数える。"
 }

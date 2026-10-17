@@ -19,20 +19,21 @@ uv が無いと hooks が動かず、ファイルの書き込みが止まる(意
 
 質問は2つまで。
 
-- 環境(hooks、CI、tools)を直したいのか、道具の機能を作りたいのか。前者は env、後者は dev の役割。
+- 開発サイクルの仕組み(hooks、CI、tools、AGENTS.md)を直したいのか、道具の機能を作りたいのか。前者は ops(運用)、後者は dev(開発)の役割。Unity を動かす作業は dev(Unity が書いたファイルも dev がコミットする)。
 - OS は Windows か。
 
-答えに合わせて、起動コマンドを1行で示す(`claude --settings .claude/settings.env.json` か `.claude/settings.dev.json`)。
+答えに合わせて、起動コマンドを1行で示す(`claude --settings .claude/settings.ops.json` か `.claude/settings.dev.json`)。起動は Issue の worktree の中で行う。
 
 ## 3 知っておくこと
 
-次の5つを、相手の役割に関わる順に、各2〜3文で話す。根拠の文書を読んでから話し、文書に無いことは言わない。
+次の6つを、相手の役割に関わる順に、各2〜3文で話す。根拠の文書を読んでから話し、文書に無いことは言わない。
 
 1. 何を作っているか(README の最初の2段落)。
 2. 2つの役割と、役割ごとに書けるもの(AGENTS.md「役割」)。
-3. 1 Issue = 1 ブランチ = 1 PR。コミットは `uv run tools/commit.py "件名" <パス>...`、テストは `uv run tools/test.py`(docs/ops/WORKFLOW.md。各手順の「なぜ」も一言添える)。
+3. 1 Issue = 1 ブランチ = 1 PR。コミットは `uv run tools/commit.py "件名" <パス>...` か `--all`、テストは `uv run tools/test.py`(docs/ops/WORKFLOW.md。各手順の「なぜ」も一言添える)。
 4. AI が書かないファイルと、その理由(docs/OWNER_WRITTEN.md)。
-5. `/pr`(差分から説明を下書きし、言い直しを受けて出す)、`/next`(済・未の一覧と残り)、`/review-pr`。
+5. `/pr`(AI が push し、差分から説明を下書きし、言い直しを受けて出す)、`/next`(済・未の一覧と残り)、`/review-pr`。
+6. Issue のまだ無い要望は「要望」のフォーム(要件、なぜ、再現)で出す。運用の役割かメンテナが読み、受けるなら作業の Issue にする。
 
 ## 4 最初の作業
 
