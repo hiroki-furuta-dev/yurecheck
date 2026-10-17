@@ -1,6 +1,6 @@
 ---
 name: next
-description: 今どの段階にいて、その段階で終えることは何かを出す。引数 all で全体の俯瞰(Milestone ごとの進み、open の PR、直近の nightly)。「次は何をすればいい」「今どこ」「全体どう」で発動する。
+description: Issue のブランチで済・未の一覧(作業、未コミット、テスト、push、PR、説明、CI、レビュー)と、次にやることを出す。引数 all で全体の俯瞰(Milestone ごとの進み、open の PR、直近の nightly)。「次は何をすればいい」「今どこ」「全体どう」で発動する。
 ---
 
 # /next

@@ -48,3 +48,23 @@ def test_duplicate_detector_catches_double_if_and_allows_steps():
     assert duplicate_keys(bad) == [(4, "if")]
     ok = "jobs:\n  a:\n    steps:\n      - name: one\n        if: x\n      - name: two\n        if: y\n"
     assert duplicate_keys(ok) == []
+
+
+TRIGGER_PR = re.compile(r"^\s*(-\s*)?pull_request(_target)?\s*:?\s*$|^on:.*\bpull_request", re.M)
+
+
+def test_self_hosted_workflows_have_no_pull_request_trigger():
+    """self-hosted の runner を使う workflow は pull_request で走らせない(.claude/rules/ops.md、docs/ops/runner.md)。"""
+    self_hosted = []
+    for f in glob.glob(os.path.join(REPO, ".github", "workflows", "*.yml")):
+        text = open(f, encoding="utf-8").read()
+        if re.search(r"^\s*runs-on:.*self-hosted", text, re.M):
+            self_hosted.append(f)
+            assert not TRIGGER_PR.search(text), f
+    assert self_hosted
+
+
+def test_pull_request_detector():
+    assert TRIGGER_PR.search("on:\n  push:\n  pull_request:\n")
+    assert TRIGGER_PR.search("on: [push, pull_request]\n")
+    assert not TRIGGER_PR.search("on:\n  push:\n# pull_request では走らせない\n    if: github.event_name != 'pull_request'\n")

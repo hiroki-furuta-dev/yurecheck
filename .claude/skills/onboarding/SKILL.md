@@ -32,11 +32,11 @@ uv が無いと hooks が動かず、ファイルの書き込みが止まる(意
 2. 2つの役割と、役割ごとに書けるもの(AGENTS.md「役割」)。
 3. 1 Issue = 1 ブランチ = 1 PR。コミットは `uv run tools/commit.py "件名" <パス>...`、テストは `uv run tools/test.py`(docs/ops/WORKFLOW.md。各手順の「なぜ」も一言添える)。
 4. AI が書かないファイルと、その理由(docs/OWNER_WRITTEN.md)。
-5. `/pr`(差分から説明を下書きし、言い直しを受けて出す)、`/next`(段階と残り)、`/review-pr`、`/handoff`。
+5. `/pr`(差分から説明を下書きし、言い直しを受けて出す)、`/next`(済・未の一覧と残り)、`/review-pr`。
 
 ## 4 最初の作業
 
-open の Issue を出す(`gh issue list`。gh が無ければ GitHub の Issues の URL を示す)。相手が選んだ Issue で `git worktree add ../yurecheck-<番号> -b feat/<番号>-<内容>` を実行し、その worktree で `/next` を走らせて「段階と残り」を見せる。Issue が無ければ、docs/ROADMAP.md の現在の Milestone から1つ提案する。
+open の Issue を出す(`gh issue list`。gh が無ければ GitHub の Issues の URL を示す)。相手が選んだ Issue で `git worktree add ../yurecheck-<番号> -b feat/<番号>-<内容>` を実行し、その worktree で `/next` を走らせて「済・未の一覧と残り」を見せる。Issue が無ければ、docs/ROADMAP.md の現在の Milestone から1つ提案する。
 
 ## 5 終わり
 

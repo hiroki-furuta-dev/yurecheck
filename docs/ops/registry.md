@@ -38,3 +38,8 @@
 | tools/doctor.py, .claude/skills/onboarding | 合流した人の環境の点検と案内。何も変更せず、直し方を提案する | 2026-10-07 追加(メンテナの指示) |
 | .claude/skills/pr | PR の説明を差分から下書きし、言い直しを受け、食い違いを直してから gh で出す。AI_USAGE の行も足す | 2026-10-08 追加(メンテナの提案) |
 | tools/status.py の段階 6 | APPROVED 待ちを廃止(作者は自分の PR を承認できず、1人では到達不能だった)。説明をメンテナが書いた + [review-pr] のコメント、に変更 | 2026-10-08 変更(メンテナの問い) |
+| tools/status.py | 段階の番号をやめ、済・未の一覧(作業、未コミット、テスト、push、PR、説明、CI、レビュー)と次にやることを出す。env と dev で同じ一覧 | 2026-10-17 変更(Issue #3。env では Issue のブランチでも「作業は無い」と出ていた) |
+| tools/test.py | env は pytest、dev は Unity を回す。Unity プロジェクトが無ければ起動せずに飛ばす。既知の失敗は xfail(strict、raises、reason に Issue か提案) | 2026-10-17 変更(Issue #3) |
+| (削除) tools/handoff.py、/handoff、SessionEnd の hook、docs/handoff/ | 2026-10-17 削除(Issue #3)。merge の後に書く HANDOFF を入れるブランチが無く、中身は PR 本文、Issue、lessons、proposals と重なるため |
+| tools/models.py | transcript から使ったモデルを数え、PR の分担欄に写す1行を出す | 2026-10-17 追加(Issue #3。handoff.py から移した) |
+| .claude/rules/ops.md の pull_request | 禁止を self-hosted の workflow に限った。tools.yml(GitHub-hosted)と食い違っていた | 2026-10-17 変更(Issue #3) |

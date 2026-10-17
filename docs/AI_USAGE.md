@@ -10,7 +10,7 @@
 
 ## モデル
 
-役割と作業の形でモデルを使い分ける(既定は .claude/settings.*.json の model と effortLevel。メンテナが決める)。長い自律実行、設計、レビューは最上位のモデル。対話で小さく直す作業と環境の定型作業は一段下のモデル。使ったモデルは手で思い出さず、SessionEnd の hook が transcript から数えて HANDOFF に書き、PR の分担欄に写す。
+役割と作業の形でモデルを使い分ける(既定は .claude/settings.*.json の model と effortLevel。メンテナが決める)。長い自律実行、設計、レビューは最上位のモデル。対話で小さく直す作業と環境の定型作業は一段下のモデル。使ったモデルは手で思い出さない。/pr が `uv run tools/models.py` で transcript から数え、PR の分担欄に写す。
 
 ## 記録
 

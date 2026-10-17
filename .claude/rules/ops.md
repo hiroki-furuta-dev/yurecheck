@@ -8,7 +8,7 @@ paths:
 
 # 環境の決まり
 
-- workflow の trigger は push、schedule、workflow_dispatch だけ。pull_request と pull_request_target は書かない(公開リポジトリで self-hosted runner を fork から守るため。docs/ops/runner.md)。
+- self-hosted runner を使う workflow には pull_request と pull_request_target を書かない。trigger は push、schedule、workflow_dispatch だけ(公開リポジトリで self-hosted runner を fork から守るため。docs/ops/runner.md)。GitHub-hosted だけで動く workflow(tools.yml)には書いてよい。tools/tests/test_workflows.py が確かめる。
 - hooks と tools は Python の標準ライブラリだけで書き、Windows と Linux の両方で動くようにする。`uv run` で呼ぶ(pyproject.toml、.python-version)。lint は ruff、テストは pytest(tools/tests/。一時の git リポジトリで完結し、本番に触れない)。tools を変えたら `uv run pytest` を通す。
 - docstring に使い方、呼び出し元、設計の参照先を書く。
 - 環境の資産を足したり変えたりしたら docs/ops/registry.md に1行足す(何を、なぜ)。
@@ -17,6 +17,6 @@ paths:
 - 検査の本体は tools/guardlib.py に1つ。hooks、tools/commit.py、tools/precommit.py(.githooks/pre-commit)が同じものを呼ぶ。ルートは対象ファイルか stdin の cwd から解く(公式の仕様: CLAUDE_PROJECT_DIR はセッションの開始地点のまま、cwd が worktree を追う。command の `${CLAUDE_PROJECT_DIR:-.}` は未設定のときの保険)。
 - Bash 経由の変更(ruff --fix、git branch -D)はファイルツールの保護を通らないので deny に明示する。allow は読み取り専用の命令だけ。Bash の commit/push のゲートに hook の `if` は使わない(`cd x && git push` のような複合コマンドが素通りするため。1回 0.03 秒なので全 Bash で回してよい)。
 - Read の deny(.env、.ssh)は Bash の cat を確実には止めない(公式も「組み込みツールだけ」と記述。変数経由で抜ける報告あり)。本線は「秘密をリポジトリの中に置かない」と commit/push 前の走査で、deny は補助。
-- 環境の変更も 1 Issue = 1 PR。smoke が通ることを確かめてから merge する。
+- 環境の変更も 1 Issue = 1 PR。CI が通ることを確かめてから merge する(CI は tools。runner を登録したら smoke も)。
 - 同じ問題が繰り返されるなら、プロンプトを足さず hook(作業後のセンサー)か型(作業前のガイド)を足す。
 - permission mode は既定の auto でよい。deny と PreToolUse hook は auto でも効き、リポジトリへの push は classifier が既定で止める(メンテナが承認する)。
