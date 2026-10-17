@@ -15,7 +15,6 @@ def tmp_repo(tmp_path):
     """小さな git リポジトリに tools/ と .claude/ を写し、本番に触れずに試す(雛形 5)。"""
     for d in ("tools", ".claude", "docs", ".githooks"):
         shutil.copytree(os.path.join(REPO, d), tmp_path / d, ignore=shutil.ignore_patterns("tests", "__pycache__", "lessons"))
-    (tmp_path / "docs" / "proposals" / "done").mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)

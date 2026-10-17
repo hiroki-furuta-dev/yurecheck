@@ -1,20 +1,28 @@
 {
-  "_comment": "役割ごとに書けない場所。hooks/pretooluse_guard.py と settings.*.json の両方がこれを参照する(二重に守る)。glob は fnmatch。",
-  "env_only": [
+  "_comment": "役割ごとの範囲。ops_only は ops だけ、dev_only は dev だけが書ける。docs/(ops を除く)と README.md はどちらも書ける。owner_written はどちらも書けない。hooks/pretooluse_guard.py と settings.*.json の両方がこれを参照する(二重に守る)。glob は fnmatch。",
+  "ops_only": [
     "AGENTS.md",
-    ".claude/*",
     ".claude/**",
-    ".github/*",
     ".github/**",
-    "tools/*",
+    ".githooks/**",
     "tools/**",
-    "Packages/manifest.json",
-    "Packages/packages-lock.json",
-    "docs/ops/*",
     "docs/ops/**",
+    "pyproject.toml",
+    ".python-version",
+    "uv.lock",
     "LICENSE",
     ".gitattributes",
     ".gitignore"
+  ],
+  "dev_only": [
+    "Assets/**",
+    "core/**",
+    "Packages/**",
+    "ProjectSettings/**",
+    "scenarios/**",
+    "presets/**",
+    "motions/**",
+    "avatars/**"
   ],
   "owner_written": [
     "docs/OWNER_WRITTEN.md",

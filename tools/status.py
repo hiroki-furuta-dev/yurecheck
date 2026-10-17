@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """済・未の一覧と残り。両方の役割が同じものを使う。
-  uv run tools/status.py          Issue のブランチでの一覧(作業 → 未コミット → テスト → push → PR → 説明 → CI → レビュー)と次にやること
+  uv run tools/status.py          Issue のブランチでの一覧(作業 → 手元の変更 → テスト → push → PR → 説明 → CI → レビュー)と次にやること
   uv run tools/status.py --all    全体の俯瞰(Milestone ごとの進み、open の PR、直近の nightly)
   uv run tools/status.py --hook   SessionStart から呼ばれる形(JSON の additionalContext で返す)
 ルートは cwd から git のルート(worktree を含む)を解く。gh があれば Issue/PR/CI も読む(無ければ「gh 無し」)。
 一覧(checklist)と次にやること(next_action)は引数だけで決まる純粋な関数で、テストから直接呼ぶ。
-役割の違いはテストの行だけ(env は pytest、dev は Unity の EditMode と PlayMode)。
+役割の違いはテストの行だけ(ops は pytest、dev は Unity の EditMode と PlayMode)。
 呼び出し元: SessionStart hook、/next。設計: docs/ops/WORKFLOW.md、docs/ops/registry.md。
 """
-import glob
 import json
 import os
 import re
@@ -19,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import guardlib  # noqa: E402
 
 ROLE = os.environ.get("YURECHECK_ROLE", "")
+REQUEST = "要望"
 
 
 def sh(args, cwd, timeout=20):
@@ -73,21 +73,16 @@ def test_state(root, head):
         return None
 
 
-def proposals(root):
-    todo = []
-    for p in sorted(glob.glob(os.path.join(root, "docs", "proposals", "*.md"))):
-        name = os.path.basename(p)
-        if name.startswith("_") or os.path.exists(os.path.join(root, "docs", "proposals", "done", name)):
-            continue
-        todo.append(name)
-    return todo
+def requests(g):
+    """「要望」の label が付いた open の Issue(まだ作業の Issue になっていないもの)。"""
+    return [i for i in g.get("issues") or [] if REQUEST in {lb.get("name") for lb in i.get("labels") or []}]
 
 
 def gh_state(root, branch):
     g = {"available": sh(["gh", "--version"], root)[0] == 0}
     if not g["available"]:
         return g
-    g["issues"] = gh_json(["issue", "list", "--state", "open", "--limit", "50", "--json", "number,title,milestone"], root) or []
+    g["issues"] = gh_json(["issue", "list", "--state", "open", "--limit", "50", "--json", "number,title,milestone,labels"], root) or []
     g["prs"] = gh_json(["pr", "list", "--state", "open", "--limit", "20", "--json",
                         "number,title,headRefName,isDraft,reviewDecision,statusCheckRollup,headRefOid,body,comments"], root) or []
     g["runs"] = gh_json(["run", "list", "--limit", "10", "--json", "name,status,conclusion,headBranch,createdAt"], root) or []
@@ -128,22 +123,22 @@ def reviewed_by_tool(pr):
     return any("[review-pr]" in (c.get("body") or "") for c in pr.get("comments") or [])
 
 
-ITEMS = ("作業", "未コミット", "テスト", "push", "PR", "説明", "CI", "レビュー")
+ITEMS = ("作業", "手元の変更", "テスト", "push", "PR", "説明", "CI", "レビュー")
 NEEDS_PR = ("説明", "CI", "レビュー")
 MERGE = "食い違いに答えたら、メンテナが merge する。worktree を消す"
 
 
 def test_row(t, role):
-    """テストの行。env は pytest の記録、dev(と未設定)は EditMode と PlayMode か「飛ばした」の記録を求める。"""
-    want = {"pytest"} if role == "env" else {"EditMode", "PlayMode"}
-    plats = set((t or {}).get("platforms") or [])
-    if not t or not plats & want:
+    """テストの行。ops は pytest の記録、dev(と未設定)は EditMode と PlayMode か「飛ばした」の記録を求める。"""
+    want = {"pytest"} if role == "ops" else {"EditMode", "PlayMode"}
+    suites = set((t or {}).get("suites") or [])
+    if not t or not suites & want:
         return "未実行", False
     if not t.get("fresh"):
         return "古い", False
     if t.get("skipped"):
         return f"飛ばした({t['skipped']})", True
-    if not plats >= want:
+    if not suites >= want:
         return "片方だけ", False
     if not t.get("passed"):
         whys = [v.get("why") for v in (t.get("summary") or {}).values() if isinstance(v, dict)]
@@ -159,7 +154,7 @@ def checklist(s, t, g, role):
     g = g or {}
     pr = g.get("my_pr")
     rows = [("作業", f"コミット {s.get('commits') or 0} 件", bool(s.get("commits")))]
-    rows.append(("未コミット", f"変更 {s['dirty']} 件", False) if s.get("dirty") else ("未コミット", "無し", True))
+    rows.append(("手元の変更", f"{s['dirty']} 件", False) if s.get("dirty") else ("手元の変更", "無し", True))
     rows.append(("テスト",) + test_row(t, role))
     if not s.get("has_upstream"):
         push = ("upstream 無し", False)
@@ -192,14 +187,14 @@ def checklist(s, t, g, role):
 
 ACTIONS = {
     ("作業", None): "作業する。区切りで uv run tools/commit.py \"件名\" <パス>... でコミットする",
-    ("未コミット", None): "uv run tools/commit.py \"件名\" <パス>... でコミットする",
+    ("手元の変更", None): "uv run tools/commit.py \"件名\" <パス>... でコミットする(全部なら --all)",
     ("テスト", None): "uv run tools/test.py を最新のコミットに対して回す",
-    ("push", None): "push する(メンテナが打つ)",
+    ("push", None): "git push -u origin HEAD",
     ("PR", "不明(gh 無し)"): "gh を PATH に通して起動し直す(PR と CI が読めない)",
     ("PR", "draft"): "draft を外す(gh pr ready)",
     ("PR", None): "/pr で出す(「何を変えたか、なぜ」はメンテナが書く)",
     ("説明", None): "PR の「何を変えたか、なぜ」をメンテナが書く(AI は書かない。docs/OWNER_WRITTEN.md)",
-    ("CI", "失敗"): "gh run view で原因を見る。環境の問題なら docs/proposals へ",
+    ("CI", "失敗"): "gh run view で原因を見る",
     ("CI", None): "CI の完了を待つ",
     ("レビュー", "変更要求"): "指摘に答えて直す。PR のコメントに返事を書く",
     ("レビュー", None): "/review-pr を回す。「説明と差分の突き合わせ」の指摘に答える",
@@ -229,9 +224,9 @@ def render(root, all_view=False):
         mark = {True: "済", False: "未", None: "―"}
         lines += [f"- [{mark[done]}] {name}: {state}" for name, state, done in rows]
         lines.append(f"残り: {next_action(rows)}")
-    todo = proposals(root)
-    if todo:
-        lines.append(f"proposals: {len(todo)} 件({', '.join(todo)})")
+    reqs = requests(g) if ROLE == "ops" else []
+    if reqs:
+        lines.append(f"要望: {len(reqs)} 件(" + ", ".join(f"#{i['number']} {i['title']}" for i in reqs) + ")")
     if not g.get("available"):
         lines.append("状態: gh 無し(Issue/PR/CI は読めない)")
     lines.append("規則: 1 PR = 1 Issue。main は PR の merge でだけ進む。メンテナが書くファイルは AI が書かない(docs/ops/WORKFLOW.md)")

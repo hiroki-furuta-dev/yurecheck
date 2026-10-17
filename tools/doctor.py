@@ -72,12 +72,12 @@ def checks(root):
     rc, hp = _run(["git", "config", "--get", "core.hooksPath"], cwd=root)
     add("core.hooksPath = .githooks", REQUIRED, hp == ".githooks", hp or "未設定",
         "git config core.hooksPath .githooks(手でコミットするときの検査)")
-    for f in (".claude/settings.env.json", ".claude/settings.dev.json", ".claude/role_paths.json"):
+    for f in (".claude/settings.ops.json", ".claude/settings.dev.json", ".claude/role_paths.json"):
         exists = os.path.exists(os.path.join(root, f))
         add(f, REQUIRED, exists, "ある" if exists else "無い", "clone が欠けている。git status を見る")
     role = os.environ.get("YURECHECK_ROLE", "")
-    add("YURECHECK_ROLE", RECOMMENDED, role in ("env", "dev"), role or "未設定",
-        "claude --settings .claude/settings.env.json か .claude/settings.dev.json で起動する(settings が設定する)")
+    add("YURECHECK_ROLE", RECOMMENDED, role in ("ops", "dev"), role or "未設定",
+        "claude --settings .claude/settings.ops.json か .claude/settings.dev.json で起動する(settings が設定する)")
     rc, dv = _run(["dotnet", "--version"])
     add("dotnet SDK", RECOMMENDED, rc == 0, dv or "無い", "core/ を触るなら要る。https://dotnet.microsoft.com/download")
     pv = os.path.join(root, "ProjectSettings", "ProjectVersion.txt")

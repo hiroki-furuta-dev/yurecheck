@@ -19,19 +19,9 @@ def _commit_all(tmp_repo):
 def test_status_fresh_branch_lists_all_untouched(tmp_repo):
     _commit_all(tmp_repo)
     subprocess.run(["git", "checkout", "-q", "-b", "worktree-5-x"], cwd=tmp_repo, check=True)
-    r = run_tool(tmp_repo, "tools/status.py", [], role="env")
+    r = run_tool(tmp_repo, "tools/status.py", [], role="ops")
     assert "(Issue #5)" in r.stdout and "- [未] 作業: 未着手" in r.stdout and "- [―] テスト: ―" in r.stdout
     assert "残り: 作業" in r.stdout
-
-
-def test_status_proposals_are_outside_the_list(tmp_repo):
-    (tmp_repo / "docs" / "proposals" / "2026-01-01-x.md").write_text("# x\n", encoding="utf-8")
-    _commit_all(tmp_repo)
-    subprocess.run(["git", "checkout", "-q", "-b", "feat/6-y"], cwd=tmp_repo, check=True)
-    for role in ("env", "dev"):
-        r = run_tool(tmp_repo, "tools/status.py", [], role=role)
-        line = next(ln for ln in r.stdout.splitlines() if ln.startswith("proposals: "))
-        assert "2026-01-01-x.md" in line and "] proposals" not in r.stdout
 
 
 def test_status_hook_outputs_json(tmp_repo):
@@ -67,3 +57,36 @@ def test_models_counts_from_session_transcript(tmp_repo):
     (tmp_repo / "results" / ".session_meta.json").write_text(json.dumps({"transcript_path": str(t)}), encoding="utf-8")
     r = run_tool(tmp_repo, "tools/models.py", [])
     assert r.returncode == 0 and r.stdout.strip() == "使ったモデル: model-a (2 発話), model-b (1 発話)"
+
+
+def test_commit_takes_deleted_and_moved_paths(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/7-z"], cwd=tmp_repo, check=True)
+    (tmp_repo / "docs" / "CONTEXT.md").unlink()
+    (tmp_repo / "README.md").rename(tmp_repo / "README2.md")
+    r = run_tool(tmp_repo, "tools/commit.py", ["消して移した", "docs/CONTEXT.md", "README.md", "README2.md"])
+    assert r.returncode == 0, r.stderr
+    st = subprocess.run(["git", "status", "--porcelain"], cwd=tmp_repo, capture_output=True, text=True).stdout
+    assert st == ""
+
+
+def test_commit_all_stages_everything_of_the_role(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/8-w"], cwd=tmp_repo, check=True)
+    (tmp_repo / "tools" / "new.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_repo / "docs" / "n.md").write_text("n\n", encoding="utf-8")
+    r = run_tool(tmp_repo, "tools/commit.py", ["全部", "--all"], role="ops")
+    assert r.returncode == 0, r.stderr
+    st = subprocess.run(["git", "status", "--porcelain"], cwd=tmp_repo, capture_output=True, text=True).stdout
+    assert st == ""
+
+
+def test_commit_all_refuses_the_other_roles_changes(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/8-v"], cwd=tmp_repo, check=True)
+    (tmp_repo / "docs" / "n.md").write_text("n\n", encoding="utf-8")
+    (tmp_repo / "tools" / "new.py").write_text("x = 1\n", encoding="utf-8")
+    r = run_tool(tmp_repo, "tools/commit.py", ["全部", "--all"], role="dev")
+    assert r.returncode == 2 and "tools/new.py" in r.stderr
+    staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp_repo, capture_output=True, text=True).stdout
+    assert staged == ""

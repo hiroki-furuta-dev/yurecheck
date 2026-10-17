@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 
 import pytest
 from conftest import run_hook
@@ -14,18 +13,31 @@ def payload(repo, rel, tool="Write"):
     return {"tool_name": tool, "tool_input": {"file_path": str(repo / rel)}, "cwd": str(repo)}
 
 
-def test_dev_cannot_write_env_paths(tmp_repo):
+def test_dev_cannot_write_ops_paths(tmp_repo):
     r = run_hook(tmp_repo, GUARD, payload(tmp_repo, ".github/workflows/x.yml"), "dev")
-    assert r.returncode == 2 and "環境の範囲" in r.stderr
+    assert r.returncode == 2 and "運用の範囲" in r.stderr
 
 
-def test_env_can_write_env_paths(tmp_repo):
-    r = run_hook(tmp_repo, GUARD, payload(tmp_repo, ".github/workflows/x.yml"), "env")
+def test_ops_can_write_ops_paths(tmp_repo):
+    r = run_hook(tmp_repo, GUARD, payload(tmp_repo, ".github/workflows/x.yml"), "ops")
     assert r.returncode == 0
 
 
+def test_ops_cannot_write_product_paths(tmp_repo):
+    """Unity が書くファイル(Packages/、ProjectSettings/)と core/ も製品の範囲。"""
+    for rel in ("Assets/a.cs", "Packages/manifest.json", "ProjectSettings/ProjectVersion.txt", "core/Yurecheck.Core/Units/M.cs"):
+        r = run_hook(tmp_repo, GUARD, payload(tmp_repo, rel), "ops")
+        assert r.returncode == 2 and "製品の範囲" in r.stderr, rel
+        assert run_hook(tmp_repo, GUARD, payload(tmp_repo, rel), "dev").returncode == 0, rel
+
+
+def test_both_roles_can_write_shared_docs(tmp_repo):
+    for role in ("ops", "dev"):
+        assert run_hook(tmp_repo, GUARD, payload(tmp_repo, "docs/lessons/x.md"), role).returncode == 0
+
+
 def test_owner_written_blocked_for_both_roles(tmp_repo):
-    for role in ("dev", "env"):
+    for role in ("dev", "ops"):
         r = run_hook(tmp_repo, GUARD, payload(tmp_repo, "docs/METRICS.md"), role)
         assert r.returncode == 2 and "メンテナが書く" in r.stderr
 
@@ -49,7 +61,7 @@ def test_non_write_tools_pass(tmp_repo):
 
 def test_owner_written_core_paths_blocked_and_other_core_allowed(tmp_repo):
     """docs/adr/0018: メンテナが書く Judge と参照実装は core/ にある。"""
-    for role in ("dev", "env"):
+    for role in ("dev", "ops"):
         r = run_hook(tmp_repo, GUARD, payload(tmp_repo, "core/Yurecheck.Core/Judge/Verdict.cs"), role)
         assert r.returncode == 2 and "メンテナが書く" in r.stderr
         r = run_hook(tmp_repo, GUARD, payload(tmp_repo, "core/Yurecheck.Core/Measure/PenetrationReference.cs"), role)
@@ -72,15 +84,16 @@ def test_pretooluse_gates_fail_closed_in_settings():
 
 
 
-@pytest.mark.xfail(sys.platform == "win32", raises=FileNotFoundError, strict=True,
-                   reason="Windows ネイティブの Python から /bin/sh が見えない。docs/proposals/2026-10-10-windows-pytest.md")
 def test_commit_gate_sh_without_uv_blocks_only_commit_push(tmp_repo):
-    """Codex 2回目の指摘: uv が無いと Bash が全部止まり doctor に届かない。検査が起動できないときは commit/push だけ止める。"""
-    path = "/usr/bin:/bin"  # coreutils はあるが uv は無い PATH
+    """Codex 2回目の指摘: uv が無いと Bash が全部止まり doctor に届かない。検査が起動できないときは commit/push だけ止める。
+    sh は PATH から探す(Windows は Git for Windows の usr/bin)。PATH は sh のある場所だけにして、coreutils はあるが uv は無い状態を作る。"""
+    sh = shutil.which("sh")
+    if not sh:
+        pytest.skip("sh が無い(Windows なら Git for Windows を入れる)")
+    path = os.path.dirname(sh)
     if shutil.which("uv", path=path):
-        pytest.skip("uv が /usr/bin にある環境では再現できない")
+        pytest.skip(f"uv が {path} にある環境では再現できない")
     env = {**os.environ, "CLAUDE_PROJECT_DIR": str(tmp_repo), "PATH": path}
-    sh = "/bin/sh"
 
     def run(cmd):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})

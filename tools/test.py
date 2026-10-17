@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""役割に合ったテストを回し、results/last_test.json に {commit, passed, platforms, when, summary} を書く(status.py が読む)。
-  uv run tools/test.py            env の役割は pytest、dev の役割(と未設定)は EditMode と PlayMode
+"""役割に合ったテストを回し、results/last_test.json に {commit, passed, suites, when, summary} を書く(status.py が読む)。
+  uv run tools/test.py            ops の役割は pytest、dev の役割(と未設定)は EditMode と PlayMode
   uv run tools/test.py --edit     Unity は EditMode だけ
 pytest の既知の失敗は xfail(strict、raises、reason に Issue 番号)で印を付け、件数を xfailed に数える。
 Unity プロジェクト(ProjectSettings/ProjectVersion.txt)が無ければ Unity を起動せず、飛ばしたことを skipped に残す。
@@ -68,7 +68,10 @@ def run(platform):
             "-testResults", out, "-logFile", os.path.join(ROOT, "results", f"{platform.lower()}.log")]
     if platform == "EditMode":
         args.insert(2, "-nographics")
-    rc = subprocess.run(args, cwd=ROOT).returncode
+    try:
+        rc = subprocess.run(args, cwd=ROOT).returncode
+    except OSError as e:
+        return False, 0, -1, f"Unity を起動できない({e.__class__.__name__})"
     if not os.path.exists(out):
         return False, 0, -1, f"XML が出なかった(終了コード {rc})"
     try:
@@ -82,15 +85,15 @@ def run(platform):
 
 
 def main():
-    if ROLE == "env":
+    if ROLE == "ops":
         ok, summary = run_pytest()
-        write_last({"passed": ok, "platforms": ["pytest"], "summary": {"pytest": summary}})
+        write_last({"passed": ok, "suites": ["pytest"], "summary": {"pytest": summary}})
         print(json.dumps(summary, ensure_ascii=False))
         return 0 if ok else fail({"pytest": summary})
     plats = ["EditMode"] if "--edit" in sys.argv else ["EditMode", "PlayMode"]
     if not os.path.exists(os.path.join(ROOT, "ProjectSettings", "ProjectVersion.txt")):
         print("ProjectSettings/ProjectVersion.txt が無いので、Unity を起動せずに止めた(Unity プロジェクトが無い)")
-        write_last({"passed": False, "skipped": "Unity プロジェクトが無い", "platforms": plats})
+        write_last({"passed": False, "skipped": "Unity プロジェクトが無い", "suites": plats})
         return 0
     if not UNITY:
         print("UNITY_PATH が未設定", file=sys.stderr)
@@ -101,7 +104,7 @@ def main():
         ok, total, failed, why = run(p)
         summary[p] = {"total": total, "failed": failed, "why": why}
         ok_all = ok_all and ok
-    write_last({"passed": ok_all, "platforms": plats, "summary": summary})
+    write_last({"passed": ok_all, "suites": plats, "summary": summary})
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if ok_all else fail(summary)
 

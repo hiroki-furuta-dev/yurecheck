@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 
-import pytest
 from conftest import REPO, commit_file, git, run_hook, run_tool
 
 sys.path.insert(0, os.path.join(REPO, "tools"))
@@ -79,7 +78,7 @@ def _s(**kw):
 
 
 def _t(ok=True):
-    return {"fresh": True, "passed": ok, "platforms": ["EditMode", "PlayMode"]}
+    return {"fresh": True, "passed": ok, "suites": ["EditMode", "PlayMode"]}
 
 
 def _pr(**kw):
@@ -97,7 +96,7 @@ def _rows(s=None, t=None, g=None, role="dev"):
 
 def test_list_order_follows_workflow():
     rows = status.checklist(_s(), _t(), _pr(), "dev")
-    assert [r[0] for r in rows] == ["作業", "未コミット", "テスト", "push", "PR", "説明", "CI", "レビュー"]
+    assert [r[0] for r in rows] == ["作業", "手元の変更", "テスト", "push", "PR", "説明", "CI", "レビュー"]
 
 
 def test_list_right_after_branching_is_all_untouched():
@@ -124,9 +123,9 @@ def test_list_merge_needs_written_explanation_and_tool_review_not_approve():
 
 def test_list_dirty_or_unpushed_or_other_head():
     rows, nxt = _rows(_s(dirty=2))
-    assert rows["未コミット"] == ("変更 2 件", False) and nxt.startswith("uv run tools/commit.py")
+    assert rows["手元の変更"] == ("2 件", False) and nxt.startswith("uv run tools/commit.py")
     rows, nxt = _rows(_s(ahead=1))
-    assert rows["push"] == ("未 push 1 件", False) and "メンテナが打つ" in nxt
+    assert rows["push"] == ("未 push 1 件", False) and nxt == "git push -u origin HEAD"
     rows, _ = _rows(_s(has_upstream=False, ahead=None), g={"available": True, "my_pr": None})
     assert rows["push"] == ("upstream 無し", False)
     rows, _ = _rows(_s(head="fff0000"))
@@ -134,25 +133,25 @@ def test_list_dirty_or_unpushed_or_other_head():
 
 
 def test_list_test_states_for_dev():
-    rows, _ = _rows(t={"fresh": False, "passed": True, "platforms": ["EditMode", "PlayMode"]})
+    rows, _ = _rows(t={"fresh": False, "passed": True, "suites": ["EditMode", "PlayMode"]})
     assert rows["テスト"] == ("古い", False)
-    rows, _ = _rows(t={"fresh": True, "passed": True, "platforms": ["EditMode"]})
+    rows, _ = _rows(t={"fresh": True, "passed": True, "suites": ["EditMode"]})
     assert rows["テスト"] == ("片方だけ", False)
-    rows, _ = _rows(t={"fresh": True, "passed": False, "platforms": ["EditMode", "PlayMode"],
+    rows, _ = _rows(t={"fresh": True, "passed": False, "suites": ["EditMode", "PlayMode"],
                        "summary": {"EditMode": {"total": 0, "failed": 0, "why": "テストが0件"}}})
     assert rows["テスト"] == ("0件", False)
-    rows, _ = _rows(t={"fresh": True, "passed": False, "platforms": ["EditMode", "PlayMode"],
+    rows, _ = _rows(t={"fresh": True, "passed": False, "suites": ["EditMode", "PlayMode"],
                        "summary": {"EditMode": {"total": 3, "failed": 1, "why": ""}}})
     assert rows["テスト"] == ("失敗", False)
-    rows, _ = _rows(t={"fresh": True, "passed": False, "skipped": "Unity プロジェクトが無い", "platforms": ["EditMode", "PlayMode"]})
+    rows, _ = _rows(t={"fresh": True, "passed": False, "skipped": "Unity プロジェクトが無い", "suites": ["EditMode", "PlayMode"]})
     assert rows["テスト"] == ("飛ばした(Unity プロジェクトが無い)", True)
 
 
 def test_list_env_reads_pytest_record_only():
-    py = {"fresh": True, "passed": True, "platforms": ["pytest"], "summary": {"pytest": {"passed": 53, "failed": 0, "xfailed": 2}}}
-    rows, _ = _rows(t=py, role="env")
+    py = {"fresh": True, "passed": True, "suites": ["pytest"], "summary": {"pytest": {"passed": 53, "failed": 0, "xfailed": 2}}}
+    rows, _ = _rows(t=py, role="ops")
     assert rows["テスト"] == ("通った(既知の失敗 2 件)", True)
-    rows, _ = _rows(t=_t(), role="env")
+    rows, _ = _rows(t=_t(), role="ops")
     assert rows["テスト"] == ("未実行", False)
     rows, _ = _rows(t=py, role="dev")
     assert rows["テスト"] == ("未実行", False)
@@ -171,8 +170,25 @@ def test_issue_number_from_branch_names():
     assert status.issue_number("main") is None and status.issue_number("fix-9") is None
 
 
+def test_status_requests_are_issues_labelled_request():
+    g = {"issues": [{"number": 4, "title": "a", "labels": [{"name": "要望"}]},
+                    {"number": 5, "title": "b", "labels": [{"name": "ops"}]}]}
+    assert [i["number"] for i in status.requests(g)] == [4]
+    assert status.requests({"available": False}) == []
+
+
+
 # 5. test.py の偽成功
-WINDOWS_PYTEST = "docs/proposals/2026-10-10-windows-pytest.md"
+def _fake_unity(tmp_repo, sh, cmd):
+    """偽の Unity。Windows は .cmd(CreateProcess が起動できる)、それ以外は #!/bin/sh。"""
+    if sys.platform == "win32":
+        fake = tmp_repo / "unity.cmd"
+        fake.write_text("@echo off\r\n" + cmd.replace("\n", "\r\n"), encoding="utf-8")
+    else:
+        fake = tmp_repo / "unity.sh"
+        fake.write_text("#!/bin/sh\n" + sh, encoding="utf-8")
+        fake.chmod(0o755)
+    return fake
 
 
 def _unity_project(tmp_repo):
@@ -180,15 +196,11 @@ def _unity_project(tmp_repo):
     (tmp_repo / "ProjectSettings" / "ProjectVersion.txt").write_text("m_EditorVersion: 6000.3.18f1\n", encoding="utf-8")
 
 
-@pytest.mark.xfail(sys.platform == "win32", raises=FileNotFoundError, strict=True,
-                   reason=f"偽の Unity(unity.sh)を Windows で起動できず last_test.json が出ない。{WINDOWS_PYTEST}")
 def test_test_py_does_not_reuse_old_xml(tmp_repo):
     _unity_project(tmp_repo)
     (tmp_repo / "results").mkdir(exist_ok=True)
     (tmp_repo / "results" / "editmode.xml").write_text('<test-run total="3" failed="0"/>', encoding="utf-8")
-    fake_unity = tmp_repo / "unity.sh"
-    fake_unity.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-    fake_unity.chmod(0o755)
+    fake_unity = _fake_unity(tmp_repo, "exit 1\n", "exit /b 1\n")
     r = run_tool(tmp_repo, "tools/test.py", ["--edit"], extra_env={"UNITY_PATH": str(fake_unity)})
     assert r.returncode == 1
     last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
@@ -197,26 +209,22 @@ def test_test_py_does_not_reuse_old_xml(tmp_repo):
 
 def test_test_py_zero_tests_is_not_success(tmp_repo):
     _unity_project(tmp_repo)
-    fake_unity = tmp_repo / "unity.sh"
-    fake_unity.write_text("#!/bin/sh\nout=''\nwhile [ $# -gt 0 ]; do if [ \"$1\" = -testResults ]; then out=$2; fi; shift; done\n"
-                          "echo '<test-run total=\"0\" failed=\"0\"/>' > \"$out\"\nexit 0\n", encoding="utf-8")
-    fake_unity.chmod(0o755)
+    fake_unity = _fake_unity(tmp_repo,
+                             "out=''\nwhile [ $# -gt 0 ]; do if [ \"$1\" = -testResults ]; then out=$2; fi; shift; done\n"
+                             "echo '<test-run total=\"0\" failed=\"0\"/>' > \"$out\"\nexit 0\n",
+                             ":loop\nif \"%~1\"==\"\" goto end\nif \"%~1\"==\"-testResults\" set \"out=%~2\"\nshift\ngoto loop\n:end\n"
+                             "echo ^<test-run total=\"0\" failed=\"0\"/^> > \"%out%\"\nexit /b 0\n")
     r = run_tool(tmp_repo, "tools/test.py", ["--edit"], extra_env={"UNITY_PATH": str(fake_unity)})
     assert r.returncode == 1
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["summary"]["EditMode"]["why"] == "テストが0件"
 
 
 
 def _marking_unity(tmp_repo):
     """起動したら印のファイルを書く偽の Unity。"""
     mark = tmp_repo / "unity_started"
-    if sys.platform == "win32":
-        fake = tmp_repo / "unity.cmd"
-        fake.write_text(f'@echo x > "{mark}"\r\n', encoding="utf-8")
-    else:
-        fake = tmp_repo / "unity.sh"
-        fake.write_text(f"#!/bin/sh\necho x > '{mark}'\n", encoding="utf-8")
-        fake.chmod(0o755)
-    return fake, mark
+    return _fake_unity(tmp_repo, f"echo x > '{mark}'\n", f'echo x > "{mark}"\n'), mark
 
 
 def test_test_py_skips_without_unity_project(tmp_repo):
@@ -238,17 +246,17 @@ def test_test_py_env_runs_pytest_and_counts_known_failures(tmp_repo):
     _pytest_suite(tmp_repo, "def test_ok():\n    pass\n\n\n"
                             "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
                             "def test_known():\n    raise KeyError\n")
-    r = run_tool(tmp_repo, "tools/test.py", [], role="env")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="ops")
     assert r.returncode == 0, r.stdout + r.stderr
     last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
-    assert last["platforms"] == ["pytest"] and last["passed"] is True
+    assert last["suites"] == ["pytest"] and last["passed"] is True
     assert last["summary"]["pytest"]["passed"] == 1 and last["summary"]["pytest"]["xfailed"] == 1
 
 
 def test_test_py_env_reports_unknown_failures_by_name(tmp_repo):
     _pytest_suite(tmp_repo, "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
                             "def test_known():\n    raise ValueError\n")
-    r = run_tool(tmp_repo, "tools/test.py", [], role="env")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="ops")
     assert r.returncode == 1
     last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
     assert last["passed"] is False and last["summary"]["pytest"]["failed_tests"] == ["tools/tests/test_x.py::test_known"]
@@ -327,15 +335,11 @@ def test_commit_gate_blocks_unscanned(tmp_repo):
 # 10. settings と role_paths の整合
 def test_settings_deny_covers_role_paths():
     rp = json.load(open(os.path.join(REPO, ".claude", "role_paths.json"), encoding="utf-8"))
-    for name in ("settings.env.json", "settings.dev.json"):
+    for name, other in (("settings.ops.json", "dev_only"), ("settings.dev.json", "ops_only")):
         d = json.load(open(os.path.join(REPO, ".claude", name), encoding="utf-8"))
         deny = set(d["permissions"]["deny"])
-        for g in rp["owner_written"]:
+        for g in rp["owner_written"] + rp[other]:
             assert f"Write(./{g})" in deny and f"Edit(./{g})" in deny, (name, g)
-    d = json.load(open(os.path.join(REPO, ".claude", "settings.dev.json"), encoding="utf-8"))
-    deny = set(d["permissions"]["deny"])
-    for g in ("AGENTS.md", ".claude/**", ".github/**", "tools/**", "docs/ops/**"):
-        assert f"Write(./{g})" in deny, g
 
 
 # 11. determinism: 0 組は失敗
