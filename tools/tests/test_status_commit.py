@@ -90,3 +90,14 @@ def test_commit_all_refuses_the_other_roles_changes(tmp_repo):
     assert r.returncode == 2 and "tools/new.py" in r.stderr
     staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp_repo, capture_output=True, text=True).stdout
     assert staged == ""
+
+
+def test_commit_takes_paths_already_staged_by_git_mv_and_git_rm(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/7-y"], cwd=tmp_repo, check=True)
+    subprocess.run(["git", "rm", "-q", "docs/CONTEXT.md"], cwd=tmp_repo, check=True)
+    subprocess.run(["git", "mv", "README.md", "README2.md"], cwd=tmp_repo, check=True)
+    r = run_tool(tmp_repo, "tools/commit.py", ["消して移した", "docs/CONTEXT.md", "README.md", "README2.md"])
+    assert r.returncode == 0, r.stderr
+    st = subprocess.run(["git", "status", "--porcelain"], cwd=tmp_repo, capture_output=True, text=True).stdout
+    assert st == ""
