@@ -8,7 +8,7 @@
 - scan(root, files): 秘密の形、秘密ファイル名、LFS 外の大きなファイル、素材の置き場。
   hard(止める)、soft(注意)、unscanned(走査できなかった) を返す
 - clean_lines(lines): HANDOFF 用。秘密・パス・URL を含む行を落とす
-呼び出し元: .claude/hooks/*.py、tools/commit.py、tools/handoff.py、tools/precommit.py。設計: docs/ops/WORKFLOW.md、.claude/rules/ops.md。
+呼び出し元: .claude/hooks/*.py、tools/commit.py、tools/precommit.py。設計: docs/ops/WORKFLOW.md、.claude/rules/ops.md。
 """
 import fnmatch
 import json
@@ -28,7 +28,7 @@ PATHLIKE = re.compile(r"(https?://|[A-Za-z]:[\\/]|\\\\|~/|/(home|Users|mnt|tmp|v
 LFS_EXT = {".vrm", ".fbx", ".mp4", ".png", ".unitypackage"}
 ASSET_EXT = {".vrm", ".fbx", ".mp4"}
 ASSET_DIRS = ("avatars/", "motions/", "docs/", "results/")
-SKIP_PREFIX = (".claude/hooks/", "tools/", "docs/handoff/")
+SKIP_PREFIX = (".claude/hooks/", "tools/")
 MAX_FILES = 500
 MAX_TEXT = 2 * 1024 * 1024
 MAX_SIZE = 10 * 1024 * 1024

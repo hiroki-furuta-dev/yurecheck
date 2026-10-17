@@ -50,7 +50,7 @@ def test_guard_resolves_root_from_target_file_in_worktree(tmp_repo):
     assert r.returncode == 2 and "メンテナが書く" in r.stderr
 
 
-# 3. handoff のフィルタ
+# 3. 秘密・パス・URL の行のフィルタ
 def test_clean_lines_drops_secrets_and_paths():
     kept, dropped = guardlib.clean_lines([
         "- github_pat_abcdefghijklmnopqrstuvwxyz0123",
@@ -61,19 +61,6 @@ def test_clean_lines_drops_secrets_and_paths():
         "- 普通の進捗",
     ])
     assert kept == ["- 普通の進捗"] and dropped == 5
-
-
-def test_handoff_filters_next_steps_from_previous_handoff(tmp_repo):
-    git(tmp_repo, "checkout", "-q", "-b", "feat/2-h")
-    (tmp_repo / "docs" / "handoff").mkdir(parents=True, exist_ok=True)
-    (tmp_repo / "docs" / "handoff" / "2026-01-01-0000-dev.md").write_text(
-        "# x\n\n## やったこと\n- a\n\n## 次にやること\n- see https://example.com/secret\n- 続き\n", encoding="utf-8")
-    commit_file(tmp_repo, "f.txt", "f\n", "f を足した")
-    r = run_tool(tmp_repo, "tools/handoff.py", [])
-    assert r.returncode == 0
-    files = sorted((tmp_repo / "docs" / "handoff").glob("*-dev.md"))
-    text = files[-1].read_text(encoding="utf-8")
-    assert "example.com" not in text
 
 
 # 4. 一覧の判定(merge 可の条件を含む)

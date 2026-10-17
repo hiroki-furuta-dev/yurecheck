@@ -91,18 +91,6 @@
         ]
       }
     ],
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/tools/handoff.py\" --auto",
-            "timeout": 60
-          }
-        ]
-      }
-    ],
     "PostToolUseFailure": [
       {
         "matcher": "",

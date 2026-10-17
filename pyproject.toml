@@ -1,7 +1,7 @@
 [project]
 name = "yurecheck-tools"
 version = "0.1.0"
-description = "Yurecheck の開発環境を保守するスクリプト(status, handoff, commit, test, determinism)と Claude Code の hooks。製品(Unity)とは別物"
+description = "Yurecheck の開発環境を保守するスクリプト(status, models, commit, test, determinism)と Claude Code の hooks。製品(Unity)とは別物"
 requires-python = ">=3.12"
 dependencies = []
 
