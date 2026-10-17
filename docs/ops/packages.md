@@ -1,6 +1,6 @@
 # 依存(Packages/manifest.json に入れるもの)
 
-PC 側で Unity 6 LTS(URP)のプロジェクトを作ってから足す。manifest.json は環境の範囲。
+PC 側で Unity 6 LTS(URP)のプロジェクトを作ってから足す。Packages/ は dev の範囲で、Unity が書いたファイルも Unity を動かした dev がコミットする。
 
 | パッケージ | 用途 | 入れ方 | ライセンス |
 |---|---|---|---|

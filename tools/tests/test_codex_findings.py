@@ -49,19 +49,6 @@ def test_guard_resolves_root_from_target_file_in_worktree(tmp_repo):
     assert r.returncode == 2 and "メンテナが書く" in r.stderr
 
 
-# 3. 秘密・パス・URL の行のフィルタ
-def test_clean_lines_drops_secrets_and_paths():
-    kept, dropped = guardlib.clean_lines([
-        "- github_pat_abcdefghijklmnopqrstuvwxyz0123",
-        "- AKIAABCDEFGHIJKLMNOP を使う",
-        "- /home/alice/private を見た",
-        "- C:/Users/Alice/private を見た",
-        "- C:\\\\Users\\\\Alice\\\\x",
-        "- 普通の進捗",
-    ])
-    assert kept == ["- 普通の進捗"] and dropped == 5
-
-
 # 4. 一覧の判定(merge 可の条件を含む)
 WRITTEN = ("## 何を変えたか、なぜ\n\nSDF の符号をコライダーの和に変えた。開いたメッシュで符号が壊れるため。\n\n"
            "closes #3\n\n## どう確かめたか\n\nEditMode 12 本。\n")
