@@ -3,15 +3,34 @@ import subprocess
 from conftest import run_tool
 
 
-def test_status_stage0_on_clean_main(tmp_repo):
+def test_status_on_main_prints_only_the_way_to_a_branch(tmp_repo):
     r = run_tool(tmp_repo, "tools/status.py", [])
-    assert r.returncode == 0 and "段階: 0 着手前" in r.stdout and "役割: dev" in r.stdout
+    assert r.returncode == 0 and "役割: dev" in r.stdout and "Issue のブランチへ" in r.stdout
+    assert "] 作業:" not in r.stdout
 
 
-def test_status_env_role_reads_proposals(tmp_repo):
-    (tmp_repo / "docs" / "proposals" / "2026-01-01-x.md").write_text("# x\n", encoding="utf-8")
+def _commit_all(tmp_repo):
+    (tmp_repo / ".gitignore").write_text("__pycache__/\nresults/\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "all"], cwd=tmp_repo, check=True)
+
+
+def test_status_fresh_branch_lists_all_untouched(tmp_repo):
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "worktree-5-x"], cwd=tmp_repo, check=True)
     r = run_tool(tmp_repo, "tools/status.py", [], role="env")
-    assert "proposals 未対応" in r.stdout and "2026-01-01-x.md" in r.stdout
+    assert "(Issue #5)" in r.stdout and "- [未] 作業: 未着手" in r.stdout and "- [―] テスト: ―" in r.stdout
+    assert "残り: 作業" in r.stdout
+
+
+def test_status_proposals_are_outside_the_list(tmp_repo):
+    (tmp_repo / "docs" / "proposals" / "2026-01-01-x.md").write_text("# x\n", encoding="utf-8")
+    _commit_all(tmp_repo)
+    subprocess.run(["git", "checkout", "-q", "-b", "feat/6-y"], cwd=tmp_repo, check=True)
+    for role in ("env", "dev"):
+        r = run_tool(tmp_repo, "tools/status.py", [], role=role)
+        line = next(ln for ln in r.stdout.splitlines() if ln.startswith("proposals: "))
+        assert "2026-01-01-x.md" in line and "] proposals" not in r.stdout
 
 
 def test_status_hook_outputs_json(tmp_repo):

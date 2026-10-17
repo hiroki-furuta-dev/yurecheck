@@ -75,16 +75,17 @@ def test_handoff_filters_next_steps_from_previous_handoff(tmp_repo):
     assert "example.com" not in text
 
 
-# 4. merge 可の判定
+# 4. 一覧の判定(merge 可の条件を含む)
 WRITTEN = ("## 何を変えたか、なぜ\n\nSDF の符号をコライダーの和に変えた。開いたメッシュで符号が壊れるため。\n\n"
            "closes #3\n\n## どう確かめたか\n\nEditMode 12 本。\n")
 EMPTY = ("## 何を変えたか、なぜ\n\n例: smoke と nightly を、RUNNER_READY 変数があるときだけ走らせた。\n\n"
          "closes #\n\n## どう確かめたか\n")
 REVIEWED = [{"body": "[review-pr] 食い違い 0 件"}]
+MERGE = "食い違いに答えたら、メンテナが merge する。worktree を消す"
 
 
 def _s(**kw):
-    base = {"branch": "feat/3-x", "dirty": 0, "ahead": 0, "has_upstream": True, "head": "abc1234", "issue": 3}
+    base = {"branch": "feat/3-x", "dirty": 0, "ahead": 0, "has_upstream": True, "head": "abc1234", "issue": 3, "commits": 2}
     base.update(kw)
     return base
 
@@ -101,40 +102,85 @@ def _pr(**kw):
     return {"available": True, "my_pr": pr}
 
 
-def test_stage_changes_requested_is_not_mergeable():
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="CHANGES_REQUESTED"))
-    assert st.startswith("5")
+def _rows(s=None, t=None, g=None, role="dev"):
+    rows = status.checklist(s or _s(), _t() if t is None else t, g or _pr(), role)
+    return {name: (state, done) for name, state, done in rows}, status.next_action(rows)
 
 
-def test_stage_review_required_is_not_mergeable():
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="REVIEW_REQUIRED"))
-    assert st.startswith("5")
+def test_list_order_follows_workflow():
+    rows = status.checklist(_s(), _t(), _pr(), "dev")
+    assert [r[0] for r in rows] == ["作業", "未コミット", "テスト", "push", "PR", "説明", "CI", "レビュー"]
 
 
-def test_stage_six_needs_written_explanation_and_tool_review_not_approve():
-    """1人では自分の PR を approve できない。6 の条件は、説明をメンテナが書いた + /review-pr のコメントがある。"""
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("5") and "説明が空" not in st
-    st, _ = status.stage_dev(_s(), _t(), _pr(body=EMPTY, comments=REVIEWED))
-    assert st.startswith("5 レビュー(説明が空)")
-    st, todo = status.stage_dev(_s(), _t(), _pr(comments=REVIEWED))
-    assert st.startswith("6") and "メンテナが merge" in todo[0]
-    st, _ = status.stage_dev(_s(), _t(), _pr(comments=REVIEWED, reviewDecision="CHANGES_REQUESTED"))
-    assert st.startswith("5")
+def test_list_right_after_branching_is_all_untouched():
+    rows, nxt = _rows(_s(commits=0), t={}, g={"available": True, "my_pr": None})
+    assert rows["作業"] == ("未着手", False)
+    assert all(v == ("―", None) for k, v in rows.items() if k != "作業")
+    assert nxt.startswith("作業")
 
 
-def test_stage_dirty_or_unpushed_with_pr_is_not_mergeable():
-    st, _ = status.stage_dev(_s(dirty=2), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("1")
-    st, _ = status.stage_dev(_s(ahead=1), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("3")
+def test_list_changes_requested_is_not_mergeable():
+    rows, nxt = _rows(g=_pr(reviewDecision="CHANGES_REQUESTED", comments=REVIEWED))
+    assert rows["レビュー"] == ("変更要求", False) and nxt.startswith("指摘に答えて")
 
 
-def test_stage_stale_or_partial_tests_block_pr():
-    st, _ = status.stage_dev(_s(), {"fresh": False, "passed": True, "platforms": ["EditMode", "PlayMode"]}, {"available": False})
-    assert st.startswith("2")
-    st, _ = status.stage_dev(_s(), {"fresh": True, "passed": True, "platforms": ["EditMode"]}, {"available": False})
-    assert st.startswith("2")
+def test_list_merge_needs_written_explanation_and_tool_review_not_approve():
+    """1人では自分の PR を approve できない。merge の条件は、説明をメンテナが書いた + /review-pr のコメントがある。"""
+    rows, _ = _rows(g=_pr(reviewDecision="APPROVED"))
+    assert rows["説明"] == ("書いた", True) and rows["レビュー"] == ("無し", False)
+    rows, _ = _rows(g=_pr(body=EMPTY, comments=REVIEWED))
+    assert rows["説明"] == ("空", False)
+    rows, nxt = _rows(g=_pr(comments=REVIEWED))
+    assert all(done for _, done in rows.values()) and nxt == MERGE
+
+
+def test_list_dirty_or_unpushed_or_other_head():
+    rows, nxt = _rows(_s(dirty=2))
+    assert rows["未コミット"] == ("変更 2 件", False) and nxt.startswith("uv run tools/commit.py")
+    rows, nxt = _rows(_s(ahead=1))
+    assert rows["push"] == ("未 push 1 件", False) and "メンテナが打つ" in nxt
+    rows, _ = _rows(_s(has_upstream=False, ahead=None), g={"available": True, "my_pr": None})
+    assert rows["push"] == ("upstream 無し", False)
+    rows, _ = _rows(_s(head="fff0000"))
+    assert rows["push"] == ("PR の head と違う", False)
+
+
+def test_list_test_states_for_dev():
+    rows, _ = _rows(t={"fresh": False, "passed": True, "platforms": ["EditMode", "PlayMode"]})
+    assert rows["テスト"] == ("古い", False)
+    rows, _ = _rows(t={"fresh": True, "passed": True, "platforms": ["EditMode"]})
+    assert rows["テスト"] == ("片方だけ", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "platforms": ["EditMode", "PlayMode"],
+                       "summary": {"EditMode": {"total": 0, "failed": 0, "why": "テストが0件"}}})
+    assert rows["テスト"] == ("0件", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "platforms": ["EditMode", "PlayMode"],
+                       "summary": {"EditMode": {"total": 3, "failed": 1, "why": ""}}})
+    assert rows["テスト"] == ("失敗", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "skipped": "Unity プロジェクトが無い", "platforms": ["EditMode", "PlayMode"]})
+    assert rows["テスト"] == ("飛ばした(Unity プロジェクトが無い)", True)
+
+
+def test_list_env_reads_pytest_record_only():
+    py = {"fresh": True, "passed": True, "platforms": ["pytest"], "summary": {"pytest": {"passed": 53, "failed": 0, "xfailed": 2}}}
+    rows, _ = _rows(t=py, role="env")
+    assert rows["テスト"] == ("通った(既知の失敗 2 件)", True)
+    rows, _ = _rows(t=_t(), role="env")
+    assert rows["テスト"] == ("未実行", False)
+    rows, _ = _rows(t=py, role="dev")
+    assert rows["テスト"] == ("未実行", False)
+
+
+def test_list_ci_waiting_and_no_gh():
+    rows, nxt = _rows(g=_pr(statusCheckRollup=[], comments=REVIEWED))
+    assert rows["CI"] == ("待ち", False) and nxt == "CI の完了を待つ"
+    rows, nxt = _rows(g={"available": False})
+    assert rows["PR"] == ("不明(gh 無し)", False) and "gh" in nxt
+
+
+def test_issue_number_from_branch_names():
+    assert status.issue_number("feat/3-status-list") == 3
+    assert status.issue_number("worktree-12-x") == 12
+    assert status.issue_number("main") is None and status.issue_number("fix-9") is None
 
 
 # 5. test.py の偽成功
