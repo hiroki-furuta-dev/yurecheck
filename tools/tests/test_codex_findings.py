@@ -49,48 +49,23 @@ def test_guard_resolves_root_from_target_file_in_worktree(tmp_repo):
     assert r.returncode == 2 and "メンテナが書く" in r.stderr
 
 
-# 3. handoff のフィルタ
-def test_clean_lines_drops_secrets_and_paths():
-    kept, dropped = guardlib.clean_lines([
-        "- github_pat_abcdefghijklmnopqrstuvwxyz0123",
-        "- AKIAABCDEFGHIJKLMNOP を使う",
-        "- /home/alice/private を見た",
-        "- C:/Users/Alice/private を見た",
-        "- C:\\\\Users\\\\Alice\\\\x",
-        "- 普通の進捗",
-    ])
-    assert kept == ["- 普通の進捗"] and dropped == 5
-
-
-def test_handoff_filters_next_steps_from_previous_handoff(tmp_repo):
-    git(tmp_repo, "checkout", "-q", "-b", "feat/2-h")
-    (tmp_repo / "docs" / "handoff").mkdir(parents=True, exist_ok=True)
-    (tmp_repo / "docs" / "handoff" / "2026-01-01-0000-dev.md").write_text(
-        "# x\n\n## やったこと\n- a\n\n## 次にやること\n- see https://example.com/secret\n- 続き\n", encoding="utf-8")
-    commit_file(tmp_repo, "f.txt", "f\n", "f を足した")
-    r = run_tool(tmp_repo, "tools/handoff.py", [])
-    assert r.returncode == 0
-    files = sorted((tmp_repo / "docs" / "handoff").glob("*-dev.md"))
-    text = files[-1].read_text(encoding="utf-8")
-    assert "example.com" not in text
-
-
-# 4. merge 可の判定
+# 4. 一覧の判定(merge 可の条件を含む)
 WRITTEN = ("## 何を変えたか、なぜ\n\nSDF の符号をコライダーの和に変えた。開いたメッシュで符号が壊れるため。\n\n"
            "closes #3\n\n## どう確かめたか\n\nEditMode 12 本。\n")
 EMPTY = ("## 何を変えたか、なぜ\n\n例: smoke と nightly を、RUNNER_READY 変数があるときだけ走らせた。\n\n"
          "closes #\n\n## どう確かめたか\n")
 REVIEWED = [{"body": "[review-pr] 食い違い 0 件"}]
+MERGE = "食い違いに答えたら、メンテナが merge する。worktree を消す"
 
 
 def _s(**kw):
-    base = {"branch": "feat/3-x", "dirty": 0, "ahead": 0, "has_upstream": True, "head": "abc1234", "issue": 3}
+    base = {"branch": "feat/3-x", "dirty": 0, "ahead": 0, "has_upstream": True, "head": "abc1234", "issue": 3, "commits": 2}
     base.update(kw)
     return base
 
 
 def _t(ok=True):
-    return {"fresh": True, "passed": ok, "platforms": ["EditMode", "PlayMode"]}
+    return {"fresh": True, "passed": ok, "suites": ["EditMode", "PlayMode"]}
 
 
 def _pr(**kw):
@@ -101,49 +76,118 @@ def _pr(**kw):
     return {"available": True, "my_pr": pr}
 
 
-def test_stage_changes_requested_is_not_mergeable():
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="CHANGES_REQUESTED"))
-    assert st.startswith("5")
+def _rows(s=None, t=None, g=None, role="dev"):
+    rows = status.checklist(s or _s(), _t() if t is None else t, g or _pr(), role)
+    return {name: (state, done) for name, state, done in rows}, status.next_action(rows)
 
 
-def test_stage_review_required_is_not_mergeable():
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="REVIEW_REQUIRED"))
-    assert st.startswith("5")
+def test_list_order_follows_workflow():
+    rows = status.checklist(_s(), _t(), _pr(), "dev")
+    assert [r[0] for r in rows] == ["作業", "手元の変更", "テスト", "push", "PR", "説明", "CI", "レビュー"]
 
 
-def test_stage_six_needs_written_explanation_and_tool_review_not_approve():
-    """1人では自分の PR を approve できない。6 の条件は、説明をメンテナが書いた + /review-pr のコメントがある。"""
-    st, _ = status.stage_dev(_s(), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("5") and "説明が空" not in st
-    st, _ = status.stage_dev(_s(), _t(), _pr(body=EMPTY, comments=REVIEWED))
-    assert st.startswith("5 レビュー(説明が空)")
-    st, todo = status.stage_dev(_s(), _t(), _pr(comments=REVIEWED))
-    assert st.startswith("6") and "メンテナが merge" in todo[0]
-    st, _ = status.stage_dev(_s(), _t(), _pr(comments=REVIEWED, reviewDecision="CHANGES_REQUESTED"))
-    assert st.startswith("5")
+def test_list_right_after_branching_is_all_untouched():
+    rows, nxt = _rows(_s(commits=0), t={}, g={"available": True, "my_pr": None})
+    assert rows["作業"] == ("未着手", False)
+    assert all(v == ("―", None) for k, v in rows.items() if k != "作業")
+    assert nxt.startswith("作業")
 
 
-def test_stage_dirty_or_unpushed_with_pr_is_not_mergeable():
-    st, _ = status.stage_dev(_s(dirty=2), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("1")
-    st, _ = status.stage_dev(_s(ahead=1), _t(), _pr(reviewDecision="APPROVED"))
-    assert st.startswith("3")
+def test_list_changes_requested_is_not_mergeable():
+    rows, nxt = _rows(g=_pr(reviewDecision="CHANGES_REQUESTED", comments=REVIEWED))
+    assert rows["レビュー"] == ("変更要求", False) and nxt.startswith("指摘に答えて")
 
 
-def test_stage_stale_or_partial_tests_block_pr():
-    st, _ = status.stage_dev(_s(), {"fresh": False, "passed": True, "platforms": ["EditMode", "PlayMode"]}, {"available": False})
-    assert st.startswith("2")
-    st, _ = status.stage_dev(_s(), {"fresh": True, "passed": True, "platforms": ["EditMode"]}, {"available": False})
-    assert st.startswith("2")
+def test_list_merge_needs_written_explanation_and_tool_review_not_approve():
+    """1人では自分の PR を approve できない。merge の条件は、説明をメンテナが書いた + /review-pr のコメントがある。"""
+    rows, _ = _rows(g=_pr(reviewDecision="APPROVED"))
+    assert rows["説明"] == ("書いた", True) and rows["レビュー"] == ("無し", False)
+    rows, _ = _rows(g=_pr(body=EMPTY, comments=REVIEWED))
+    assert rows["説明"] == ("空", False)
+    rows, nxt = _rows(g=_pr(comments=REVIEWED))
+    assert all(done for _, done in rows.values()) and nxt == MERGE
+
+
+def test_list_dirty_or_unpushed_or_other_head():
+    rows, nxt = _rows(_s(dirty=2))
+    assert rows["手元の変更"] == ("2 件", False) and nxt.startswith("uv run tools/commit.py")
+    rows, nxt = _rows(_s(ahead=1))
+    assert rows["push"] == ("未 push 1 件", False) and nxt == "git push -u origin HEAD"
+    rows, _ = _rows(_s(has_upstream=False, ahead=None), g={"available": True, "my_pr": None})
+    assert rows["push"] == ("upstream 無し", False)
+    rows, _ = _rows(_s(head="fff0000"))
+    assert rows["push"] == ("PR の head と違う", False)
+
+
+def test_list_test_states_for_dev():
+    rows, _ = _rows(t={"fresh": False, "passed": True, "suites": ["EditMode", "PlayMode"]})
+    assert rows["テスト"] == ("古い", False)
+    rows, _ = _rows(t={"fresh": True, "passed": True, "suites": ["EditMode"]})
+    assert rows["テスト"] == ("片方だけ", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "suites": ["EditMode", "PlayMode"],
+                       "summary": {"EditMode": {"total": 0, "failed": 0, "why": "テストが0件"}}})
+    assert rows["テスト"] == ("0件", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "suites": ["EditMode", "PlayMode"],
+                       "summary": {"EditMode": {"total": 3, "failed": 1, "why": ""}}})
+    assert rows["テスト"] == ("失敗", False)
+    rows, _ = _rows(t={"fresh": True, "passed": False, "skipped": "Unity プロジェクトが無い", "suites": ["EditMode", "PlayMode"]})
+    assert rows["テスト"] == ("飛ばした(Unity プロジェクトが無い)", True)
+
+
+def test_list_env_reads_pytest_record_only():
+    py = {"fresh": True, "passed": True, "suites": ["pytest"], "summary": {"pytest": {"passed": 53, "failed": 0, "xfailed": 2}}}
+    rows, _ = _rows(t=py, role="ops")
+    assert rows["テスト"] == ("通った(既知の失敗 2 件)", True)
+    rows, _ = _rows(t=_t(), role="ops")
+    assert rows["テスト"] == ("未実行", False)
+    rows, _ = _rows(t=py, role="dev")
+    assert rows["テスト"] == ("未実行", False)
+
+
+def test_list_ci_waiting_and_no_gh():
+    rows, nxt = _rows(g=_pr(statusCheckRollup=[], comments=REVIEWED))
+    assert rows["CI"] == ("待ち", False) and nxt == "CI の完了を待つ"
+    rows, nxt = _rows(g={"available": False})
+    assert rows["PR"] == ("不明(gh 無し)", False) and "gh" in nxt
+
+
+def test_issue_number_from_branch_names():
+    assert status.issue_number("feat/3-status-list") == 3
+    assert status.issue_number("worktree-12-x") == 12
+    assert status.issue_number("main") is None and status.issue_number("fix-9") is None
+
+
+def test_status_requests_are_issues_labelled_request():
+    g = {"issues": [{"number": 4, "title": "a", "labels": [{"name": "要望"}]},
+                    {"number": 5, "title": "b", "labels": [{"name": "ops"}]}]}
+    assert [i["number"] for i in status.requests(g)] == [4]
+    assert status.requests({"available": False}) == []
+
 
 
 # 5. test.py の偽成功
+def _fake_unity(tmp_repo, sh, cmd):
+    """偽の Unity。Windows は .cmd(CreateProcess が起動できる)、それ以外は #!/bin/sh。"""
+    if sys.platform == "win32":
+        fake = tmp_repo / "unity.cmd"
+        fake.write_text("@echo off\r\n" + cmd.replace("\n", "\r\n"), encoding="utf-8")
+    else:
+        fake = tmp_repo / "unity.sh"
+        fake.write_text("#!/bin/sh\n" + sh, encoding="utf-8")
+        fake.chmod(0o755)
+    return fake
+
+
+def _unity_project(tmp_repo):
+    (tmp_repo / "ProjectSettings").mkdir(exist_ok=True)
+    (tmp_repo / "ProjectSettings" / "ProjectVersion.txt").write_text("m_EditorVersion: 6000.3.18f1\n", encoding="utf-8")
+
+
 def test_test_py_does_not_reuse_old_xml(tmp_repo):
+    _unity_project(tmp_repo)
     (tmp_repo / "results").mkdir(exist_ok=True)
     (tmp_repo / "results" / "editmode.xml").write_text('<test-run total="3" failed="0"/>', encoding="utf-8")
-    fake_unity = tmp_repo / "unity.sh"
-    fake_unity.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-    fake_unity.chmod(0o755)
+    fake_unity = _fake_unity(tmp_repo, "exit 1\n", "exit /b 1\n")
     r = run_tool(tmp_repo, "tools/test.py", ["--edit"], extra_env={"UNITY_PATH": str(fake_unity)})
     assert r.returncode == 1
     last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
@@ -151,13 +195,58 @@ def test_test_py_does_not_reuse_old_xml(tmp_repo):
 
 
 def test_test_py_zero_tests_is_not_success(tmp_repo):
-    fake_unity = tmp_repo / "unity.sh"
-    fake_unity.write_text("#!/bin/sh\nout=''\nwhile [ $# -gt 0 ]; do if [ \"$1\" = -testResults ]; then out=$2; fi; shift; done\n"
-                          "echo '<test-run total=\"0\" failed=\"0\"/>' > \"$out\"\nexit 0\n", encoding="utf-8")
-    fake_unity.chmod(0o755)
+    _unity_project(tmp_repo)
+    fake_unity = _fake_unity(tmp_repo,
+                             "out=''\nwhile [ $# -gt 0 ]; do if [ \"$1\" = -testResults ]; then out=$2; fi; shift; done\n"
+                             "echo '<test-run total=\"0\" failed=\"0\"/>' > \"$out\"\nexit 0\n",
+                             ":loop\nif \"%~1\"==\"\" goto end\nif \"%~1\"==\"-testResults\" set \"out=%~2\"\nshift\ngoto loop\n:end\n"
+                             "echo ^<test-run total=\"0\" failed=\"0\"/^> > \"%out%\"\nexit /b 0\n")
     r = run_tool(tmp_repo, "tools/test.py", ["--edit"], extra_env={"UNITY_PATH": str(fake_unity)})
     assert r.returncode == 1
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["summary"]["EditMode"]["why"] == "テストが0件"
 
+
+
+def _marking_unity(tmp_repo):
+    """起動したら印のファイルを書く偽の Unity。"""
+    mark = tmp_repo / "unity_started"
+    return _fake_unity(tmp_repo, f"echo x > '{mark}'\n", f'echo x > "{mark}"\n'), mark
+
+
+def test_test_py_skips_without_unity_project(tmp_repo):
+    fake, mark = _marking_unity(tmp_repo)
+    r = run_tool(tmp_repo, "tools/test.py", [], extra_env={"UNITY_PATH": str(fake)})
+    assert r.returncode == 0 and not mark.exists()
+    assert "ProjectSettings/ProjectVersion.txt が無い" in r.stdout + r.stderr
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    head = git(tmp_repo, "rev-parse", "--short", "HEAD").stdout.strip()
+    assert last["skipped"] == "Unity プロジェクトが無い" and last["commit"] == head and last["passed"] is False
+
+
+def _pytest_suite(tmp_repo, body):
+    (tmp_repo / "tools" / "tests").mkdir(exist_ok=True)
+    (tmp_repo / "tools" / "tests" / "test_x.py").write_text("import pytest\n\n\n" + body, encoding="utf-8")
+
+
+def test_test_py_env_runs_pytest_and_counts_known_failures(tmp_repo):
+    _pytest_suite(tmp_repo, "def test_ok():\n    pass\n\n\n"
+                            "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
+                            "def test_known():\n    raise KeyError\n")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="ops")
+    assert r.returncode == 0, r.stdout + r.stderr
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["suites"] == ["pytest"] and last["passed"] is True
+    assert last["summary"]["pytest"]["passed"] == 1 and last["summary"]["pytest"]["xfailed"] == 1
+
+
+def test_test_py_env_reports_unknown_failures_by_name(tmp_repo):
+    _pytest_suite(tmp_repo, "@pytest.mark.xfail(raises=KeyError, strict=True, reason='#9')\n"
+                            "def test_known():\n    raise ValueError\n")
+    r = run_tool(tmp_repo, "tools/test.py", [], role="ops")
+    assert r.returncode == 1
+    last = json.loads((tmp_repo / "results" / "last_test.json").read_text(encoding="utf-8"))
+    assert last["passed"] is False and last["summary"]["pytest"]["failed_tests"] == ["tools/tests/test_x.py::test_known"]
 
 # 6. commit.py: 指定外のステージ済み
 def test_commit_refuses_when_other_changes_are_staged(tmp_repo):
@@ -233,15 +322,11 @@ def test_commit_gate_blocks_unscanned(tmp_repo):
 # 10. settings と role_paths の整合
 def test_settings_deny_covers_role_paths():
     rp = json.load(open(os.path.join(REPO, ".claude", "role_paths.json"), encoding="utf-8"))
-    for name in ("settings.env.json", "settings.dev.json"):
+    for name, other in (("settings.ops.json", "dev_only"), ("settings.dev.json", "ops_only")):
         d = json.load(open(os.path.join(REPO, ".claude", name), encoding="utf-8"))
         deny = set(d["permissions"]["deny"])
-        for g in rp["owner_written"]:
+        for g in rp["owner_written"] + rp[other]:
             assert f"Write(./{g})" in deny and f"Edit(./{g})" in deny, (name, g)
-    d = json.load(open(os.path.join(REPO, ".claude", "settings.dev.json"), encoding="utf-8"))
-    deny = set(d["permissions"]["deny"])
-    for g in ("AGENTS.md", ".claude/**", ".github/**", "tools/**", "docs/ops/**"):
-        assert f"Write(./{g})" in deny, g
 
 
 # 11. determinism: 0 組は失敗

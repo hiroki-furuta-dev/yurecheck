@@ -1,5 +1,5 @@
 {
-  "_comment": "共通の設定。役割ごとの差分は settings.env.json / settings.dev.json を claude --settings で重ねる。permission mode は既定の auto でよい(deny と PreToolUse hook は auto でも効き、push は classifier が既定で止める)。allow は読み取り専用の命令だけ。hooks と tools は uv run で呼ぶ。止めるのは PreToolUse(ファイルの guard と commit/push のゲート)と git の pre-commit。attribution は切ってある(AI の関与は docs/AI_USAGE.md と PR の分担欄に残す)。",
+  "_comment": "共通の設定。役割ごとの差分は settings.ops.json / settings.dev.json を claude --settings で重ねる。permission mode は既定の auto でよい(deny と PreToolUse hook は auto でも効き、push は classifier が既定で止める)。allow は読み取り専用の命令だけ。hooks と tools は uv run で呼ぶ。止めるのは PreToolUse(ファイルの guard と commit/push のゲート)と git の pre-commit。attribution は切ってある(AI の関与は docs/AI_USAGE.md と PR の分担欄に残す)。",
   "permissions": {
     "allow": [
       "Read",
@@ -34,7 +34,8 @@
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(~/.ssh/**)",
-      "Read(~/.claude/**)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.claude/settings.json)",
       "Read(./.claude/settings.local.json)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
@@ -86,18 +87,6 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/commit_gate.sh\"",
-            "timeout": 60
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --quiet \"${CLAUDE_PROJECT_DIR}/tools/handoff.py\" --auto",
             "timeout": 60
           }
         ]

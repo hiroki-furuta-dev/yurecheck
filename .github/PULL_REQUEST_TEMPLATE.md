@@ -15,6 +15,6 @@ closes #
 ## AI と人の分担
 
 例: AI が書いた。人が直したのは符号の規則(Sign.cs)。モデル: claude-opus-5-5
-(モデルは /handoff の「使ったモデル」の行を写す。docs/AI_USAGE.md にも1行)
+(モデルは `uv run tools/models.py` の出力を写す。docs/AI_USAGE.md にも1行)
 
 <!-- /pr が下2つを差分から下書きし、1つ目はメンテナの入力をそのまま入れて gh で出す。 -->

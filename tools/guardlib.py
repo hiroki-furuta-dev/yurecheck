@@ -7,8 +7,7 @@
   -z で NUL 区切りを読む(日本語名、rename に対応)
 - scan(root, files): 秘密の形、秘密ファイル名、LFS 外の大きなファイル、素材の置き場。
   hard(止める)、soft(注意)、unscanned(走査できなかった) を返す
-- clean_lines(lines): HANDOFF 用。秘密・パス・URL を含む行を落とす
-呼び出し元: .claude/hooks/*.py、tools/commit.py、tools/handoff.py、tools/precommit.py。設計: docs/ops/WORKFLOW.md、.claude/rules/ops.md。
+呼び出し元: .claude/hooks/*.py、tools/commit.py、tools/precommit.py。設計: docs/ops/WORKFLOW.md、.claude/rules/ops.md。
 """
 import fnmatch
 import json
@@ -24,11 +23,10 @@ SECRET = re.compile(
     re.I,
 )
 SECRET_NAMES = re.compile(r"(^|/)(\.env(\..*)?|.*\.(pem|key|p12|pfx|jks)|id_(rsa|ed25519|ecdsa)(\.pub)?|.*\.secret)$", re.I)
-PATHLIKE = re.compile(r"(https?://|[A-Za-z]:[\\/]|\\\\|~/|/(home|Users|mnt|tmp|var|etc|opt|root|srv)/|/[\w.-]+/[\w.-]+\.\w+)", re.I)
 LFS_EXT = {".vrm", ".fbx", ".mp4", ".png", ".unitypackage"}
 ASSET_EXT = {".vrm", ".fbx", ".mp4"}
 ASSET_DIRS = ("avatars/", "motions/", "docs/", "results/")
-SKIP_PREFIX = (".claude/hooks/", "tools/", "docs/handoff/")
+SKIP_PREFIX = (".claude/hooks/", "tools/")
 MAX_FILES = 500
 MAX_TEXT = 2 * 1024 * 1024
 MAX_SIZE = 10 * 1024 * 1024
@@ -172,13 +170,3 @@ def scan(root, files, attribution=None):
         except Exception:
             unscanned.append(rp)
     return hard, soft, unscanned
-
-
-def clean_lines(lines):
-    kept, dropped = [], 0
-    for line in lines:
-        if SECRET.search(line) or PATHLIKE.search(line):
-            dropped += 1
-        else:
-            kept.append(line)
-    return kept, dropped

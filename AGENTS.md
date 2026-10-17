@@ -4,15 +4,18 @@ VRM アバターの揺れもの(髪、スカート、リボン、尻尾)の設�
 
 ## 役割
 
-このリポジトリの Claude Code は2つの役割のどちらかで起動する。環境変数 YURECHECK_ROLE が役割(env か dev)。セッションの最初に役割を1行で宣言する。未設定のまま読む・調べる・答えるのはよい。ファイルを書く前には、`claude --settings .claude/settings.env.json` か `.claude/settings.dev.json` で起動し直すよう案内する(hook も止める)。
+このリポジトリの Claude Code は2つの役割のどちらかで起動する。環境変数 YURECHECK_ROLE が役割(ops か dev)。セッションの最初に役割を1行で宣言する。未設定のまま読む・調べる・答えるのはよい。ファイルを書く前には、`claude --settings .claude/settings.ops.json` か `.claude/settings.dev.json` で起動し直すよう案内する(hook も止める)。
+
+範囲の正本は .claude/role_paths.json(ops_only、dev_only、owner_written)。下の表はその写し。
 
 | 役割 | 目的 | 書けるもの |
 |---|---|---|
-| env(環境) | 開発環境を作り保守する | AGENTS.md、.claude/、.github/、tools/、Packages/manifest.json、docs/ |
-| dev(開発) | 道具の機能を作る | Assets/、Tests/、docs/(ops を除く)、scenarios/、presets/、motions/ATTRIBUTION.md |
+| ops(運用) | 開発サイクルを回す仕組みを作り保守する | AGENTS.md、.claude/、.github/、.githooks/、tools/、docs/ops/、pyproject.toml、.python-version、uv.lock、LICENSE、.gitattributes、.gitignore、docs/、README.md |
+| dev(開発) | 道具の機能を作る | Assets/、core/、Packages/、ProjectSettings/、scenarios/、presets/、motions/、avatars/、docs/(ops を除く)、README.md |
 
 - 役割はファイルを管理する。もう一方の役割に指示は出さない。
-- 開発の役割が環境を変えたいときは docs/proposals/YYYY-MM-DD-内容.md に要件だけ書く。環境の役割が次の起動で読む。
+- Unity が書いたファイル(Packages/、ProjectSettings/、.meta)は、Unity を動かした役割(dev)がコミットする。
+- 開発の役割が運用を変えたいときは「要望」の Issue(要件、なぜ、再現)を立てる。運用の役割が次の起動で読む。gh issue create の前にメンテナに本文を見せる。
 - メンテナが書くファイル(docs/OWNER_WRITTEN.md)は AI が書かない。読んで提案だけする。理由は、指標の式と判定をメンテナが自分の言葉で説明できる状態に保つため。settings の deny と Write/Edit の PreToolUse hook の両方が止める(worktree に移っても対象ファイルからルートを解く)。
 
 ## 作業の流れ
@@ -20,17 +23,18 @@ VRM アバターの揺れもの(髪、スカート、リボン、尻尾)の設�
 1 Issue = 1 ブランチ = 1 PR。各手順の理由は docs/ops/WORKFLOW.md。
 
 1. Issue を選ぶ。`git worktree add ../yurecheck-<番号> -b feat/<番号>-<内容>`。main では作業しない。
-2. 作業し、区切りで `uv run tools/commit.py "件名" <パス>...` でコミットする。渡したパスだけがステージされる。`git add -A` は使わない。件名は「何をしたか」。
+2. 作業し、区切りで `uv run tools/commit.py "件名" <パス>...` でコミットする。渡したパスだけがステージされる。手元の変更が全部この役割のものなら `--all`(もう一方の役割とメンテナのファイルが混ざれば止まる)。
 3. `uv run tools/test.py` でテストを回す。
-4. `/pr` で PR を出す。「何を変えたか、なぜ」はメンテナが書く(AI は書かない)。残り2つは差分から下書きし、食い違いを見てから gh で送る。
-5. smoke が通ったら `/review-pr`。食い違いの指摘に PR のコメントで答える。
-6. 食い違いに答えたら、メンテナが merge する。終わりに `/handoff`。
+4. AI が push し、`/pr` で PR を出す。「何を変えたか、なぜ」はメンテナが書く(AI は書かない)。残り2つは差分から下書きし、食い違いを見てから gh で送る。
+5. CI が通ったら `/review-pr`。食い違いの指摘に PR のコメントで答える。CI は tools を指し、runner を登録したら smoke も含める。
+6. 食い違いに答えたら、メンテナが merge する。worktree を消す。
 
-`/next` で「段階と残り」が出る。`/next all` は全体の俯瞰。
+`/next` で「済・未の一覧と残り」が出る。`/next all` は全体の俯瞰。
 
 ## 仕事の仕方
 
-- 頼まれた範囲だけを変える。作業中に見つけた別のバグ、整理したくなるコード、将来のための抽象化は、直さずに PR の要約に「続き」として書く。要らないエラー処理や互換のための分岐は足さない。
+- Issue は結果を示す。結果に要る変更は本文に無くても同じ PR で行い、PR 本文の「どう確かめたか」の下に「範囲の外で直したもの」として書く。要らない改善(整理、将来のための抽象化)は直さず「続き」に書く。
+- 決めてよいこと(名前、並び、文言、テストの形、小さな設計)は自分で決めて PR 本文に書く。聞くのは結果を左右する分岐だけで、質問は1回にまとめる。
 - 小さな変更はファイルを丸ごと書き直さず、該当箇所だけを編集する。
 - 進捗を報告するときは、このセッションのツールの結果で裏付けられることだけを書く。テストが失敗したら出力ごと書く。飛ばした手順はそう書く。
 - テストは、作業が求める振る舞いに1つずつ、隣のテストと同じ大きさで書く。確認のための使い捨てのスクリプトはコミットしない。

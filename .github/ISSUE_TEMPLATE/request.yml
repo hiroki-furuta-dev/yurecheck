@@ -1,0 +1,29 @@
+name: 要望
+description: まだ作業の形になっていない、変えてほしいこと。受けたら作業の Issue にする
+title: ""
+labels: ["要望"]
+body:
+  - type: markdown
+    attributes:
+      value: 要件だけを書き、実装の方法は書かない。運用の役割かメンテナが読み、受けるなら作業の Issue を立てる(docs/ops/WORKFLOW.md「Issue になる前」)。
+  - type: textarea
+    id: requirement
+    attributes:
+      label: 要件
+      description: 何がどうなってほしいか
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: なぜ
+      description: 今のままだと何が困るか。根拠になる規則や文書があれば挙げる
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現
+      description: 日付、ブランチとコミット、役割、OS、手順、出た結果。確かめていなければ「未確認」
+    validations:
+      required: false

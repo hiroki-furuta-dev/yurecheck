@@ -1,11 +1,11 @@
 ---
 name: review-pr
-description: 現在のブランチの PR をレビューする。Codex の adversarial review を回し、「説明と差分の突き合わせ」(説明にあるが diff に無い、diff にあるが説明に無い、主張を裏付けるテストの有無)を含めて PR のコメントに投稿する。段階 5 で使う。
+description: 現在のブランチの PR をレビューする。Codex の adversarial review を回し、「説明と差分の突き合わせ」(説明にあるが diff に無い、diff にあるが説明に無い、主張を裏付けるテストの有無)を含めて PR のコメントに投稿する。CI が通った後に使う。
 ---
 
 # /review-pr
 
-前提: 現在のブランチに open の PR があり、smoke が成功している(`python tools/status.py` で段階 5)。
+前提: 現在のブランチに open の PR があり、CI が通っている(`uv run tools/status.py` で CI が済)。
 
 1. `gh pr view --json number,title,body,baseRefName` で PR の本文を取り、「何を変えたか、なぜ」の欄を抜き出す。空なら止めて、メンテナに書いてもらう。
 2. `git diff origin/main...HEAD` を取る。

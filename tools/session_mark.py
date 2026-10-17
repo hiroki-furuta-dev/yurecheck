@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SessionStart hook。セッション開始時刻と transcript のパスを results/ に残す(handoff.py が使う)。
+"""SessionStart hook。セッション開始時刻と transcript のパスを results/ に残す(tools/models.py が使う)。
 標準入力に hook の JSON(session_id, transcript_path, cwd ...)が来る。無くても動く。
 呼び出し元: .claude/settings.json の SessionStart。設計: docs/ops/WORKFLOW.md 8。
 """

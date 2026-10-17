@@ -6,7 +6,7 @@ import os
 
 from conftest import REPO
 
-FILES = (".claude/settings.json", ".claude/settings.env.json", ".claude/settings.dev.json")
+FILES = (".claude/settings.json", ".claude/settings.ops.json", ".claude/settings.dev.json")
 
 
 def _load(name):

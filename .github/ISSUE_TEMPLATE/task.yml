@@ -1,0 +1,52 @@
+name: 作業
+description: 1 PR で終わる大きさの作業。結果と完了の条件を先に決める
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: 立てたら、役割と同じ label(ops か dev)を付ける。まだ結果が書けないなら「要望」のフォームを使う。
+  - type: textarea
+    id: result
+    attributes:
+      label: 結果
+      description: 終わったら何ができるようになるか。変更の方法ではなく、外から見える結果を書く
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了の条件
+      description: 確かめ方が分かる形で。1行1条件
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: 含まないもの
+      description: この Issue ではやらないこと。続きは別の Issue にする
+    validations:
+      required: false
+  - type: dropdown
+    id: role
+    attributes:
+      label: 役割
+      description: 書くファイルで決まる(.claude/role_paths.json)
+      options:
+        - ops(運用)
+        - dev(開発)
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options:
+        - M0 基盤
+        - M1 指標
+        - M2 判定
+        - M3 公開
+        - M4 判断
+    validations:
+      required: true

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse hook(Write/Edit/MultiEdit): settings の deny の保険。
-役割(YURECHECK_ROLE=env|dev)と .claude/role_paths.json を見て、
+役割(YURECHECK_ROLE=ops|dev)と .claude/role_paths.json を見て、
 - メンテナが書くファイル(owner_written)への Write/Edit は、どちらの役割でも止める
-- 環境の範囲(env_only)への Write/Edit は、開発の役割では止める
+- 運用の範囲(ops_only)への Write/Edit は、ops 以外の役割では止める
+- 製品の範囲(dev_only)への Write/Edit は、ops の役割では止める(2つの役割を混ぜない)
 ルートは対象ファイルから git のルート(worktree を含む)を解く。CLAUDE_PROJECT_DIR は開始地点のまま動かないので使わない。
 止めるときは exit 2 で理由を stderr に出す。判断できないときは止めない。
 スクリプト自体が起動できない・落ちたときは settings の `|| exit 2` が閉じる。
@@ -41,15 +42,19 @@ def main() -> int:
         r = guardlib.rel(p, root)
         if guardlib.matches(r, rp.get("owner_written")):
             sys.stderr.write(f"[guard] {r} はメンテナが書くファイル(docs/OWNER_WRITTEN.md)。AI は書かない。"
-                             "提案は docs/proposals/ か PR のコメントに書く。\n")
+                             "提案は PR のコメントに書く。\n")
             return 2
-        if role != "env" and guardlib.matches(r, rp.get("env_only")):
-            sys.stderr.write(f"[guard] {r} は環境の範囲。役割 '{role or '未指定'}' では書けない。"
-                             "変えたいときは docs/proposals/YYYY-MM-DD-内容.md に要件を書く(実装方法は書かない)。"
-                             "環境の役割で開くには: claude --settings .claude/settings.env.json\n")
+        if role != "ops" and guardlib.matches(r, rp.get("ops_only")):
+            sys.stderr.write(f"[guard] {r} は運用の範囲。役割 '{role or '未指定'}' では書けない。"
+                             "変えたいときは「要望」の Issue を立てる(要件だけ。.github/ISSUE_TEMPLATE/request.yml)。"
+                             "運用の役割で開くには: claude --settings .claude/settings.ops.json\n")
+            return 2
+        if role == "ops" and guardlib.matches(r, rp.get("dev_only")):
+            sys.stderr.write(f"[guard] {r} は製品の範囲。役割 'ops' では書けない。"
+                             "変えたいときは「要望」の Issue を立てる。開発の役割で開くには: claude --settings .claude/settings.dev.json\n")
             return 2
     if not role:
-        sys.stderr.write("[guard] YURECHECK_ROLE が未設定。--settings .claude/settings.env.json か settings.dev.json で起動すること。\n")
+        sys.stderr.write("[guard] YURECHECK_ROLE が未設定。--settings .claude/settings.ops.json か settings.dev.json で起動すること。\n")
     return 0
 
 
